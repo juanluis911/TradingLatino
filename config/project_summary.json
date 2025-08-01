@@ -1,0 +1,44 @@
+{
+  "project_name": "Jaime Merino Trading Bot",
+  "version": "2.0.0",
+  "methodology": "JAIME_MERINO",
+  "philosophy": "El arte de tomar dinero de otros legalmente",
+  "setup_date": "2025-08-01T16:31:05.353942",
+  "features": [
+    "Análisis técnico avanzado según metodología Merino",
+    "EMAs 11/55, ADX modificado, Squeeze Momentum, Volume Profile",
+    "Análisis multi-temporal (4H, 1H, Diario)",
+    "Gestión de riesgo 40-30-20-10",
+    "Sistema de señales con confluencias",
+    "Interfaz web moderna con WebSockets",
+    "Backtesting integrado",
+    "Dashboard en tiempo real"
+  ],
+  "supported_symbols": [
+    "BTCUSDT",
+    "ETHUSDT",
+    "ADAUSDT",
+    "BNBUSDT",
+    "SOLUSDT",
+    "XRPUSDT",
+    "DOTUSDT",
+    "LINKUSDT"
+  ],
+  "files_created": [
+    "enhanced_app.py",
+    "enhanced_config.py",
+    "models/enhanced_trading_model.py",
+    "services/enhanced_analysis_service.py",
+    "services/enhanced_indicators.py",
+    "services/merino_backtesting.py",
+    "websocket/enhanced_socket_handlers.py",
+    "templates/merino_dashboard.html",
+    "static/css/merino_styles.css",
+    "static/js/merino_client.js",
+    ".env",
+    "README.md",
+    ".gitignore",
+    "run_merino.sh",
+    "run_merino.bat"
+  ]
+}

@@ -1,0 +1,990 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jaime Merino Trading Bot - Metodología Trading Latino</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #2c3e50;
+            --secondary-color: #3498db;
+            --success-color: #27ae60;
+            --danger-color: #e74c3c;
+            --warning-color: #f39c12;
+            --info-color: #8e44ad;
+            --dark-bg: #1a1a1a;
+            --card-bg: #2d3436;
+            --text-primary: #ffffff;
+            --text-secondary: #b2bec3;
+            --border-color: #636e72;
+            --gradient-bg: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--dark-bg);
+            color: var(--text-primary);
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        .header {
+            background: var(--gradient-bg);
+            padding: 1rem 0;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grain" width="100" height="100" patternUnits="userSpaceOnUse"><circle cx="25" cy="25" r="1" fill="rgba(255,255,255,0.1)"/><circle cx="75" cy="75" r="1" fill="rgba(255,255,255,0.1)"/></pattern></defs><rect width="100" height="100" fill="url(%23grain)"/></svg>');
+            opacity: 0.3;
+        }
+
+        .header-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 2rem;
+            position: relative;
+            z-index: 1;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            text-align: center;
+            margin-bottom: 0.5rem;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header .subtitle {
+            text-align: center;
+            font-size: 1.2rem;
+            opacity: 0.9;
+            margin-bottom: 1rem;
+        }
+
+        .philosophy-banner {
+            background: rgba(255,255,255,0.1);
+            border-radius: 10px;
+            padding: 1rem;
+            text-align: center;
+            font-style: italic;
+            font-size: 1.1rem;
+            backdrop-filter: blur(10px);
+        }
+
+        .main-container {
+            max-width: 1400px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+            display: grid;
+            grid-template-columns: 1fr 350px;
+            gap: 2rem;
+        }
+
+        .content-area {
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border-radius: 15px;
+            padding: 1.5rem;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            border: 1px solid var(--border-color);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: var(--gradient-bg);
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 40px rgba(0,0,0,0.4);
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .card-title {
+            font-size: 1.4rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.9rem;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        .status-dot.connected { background: var(--success-color); }
+        .status-dot.disconnected { background: var(--danger-color); }
+        .status-dot.analyzing { background: var(--warning-color); }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .controls-section {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .btn {
+            padding: 0.8rem 1.5rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: left 0.5s;
+        }
+
+        .btn:hover::before {
+            left: 100%;
+        }
+
+        .btn-primary {
+            background: var(--secondary-color);
+            color: white;
+        }
+
+        .btn-success {
+            background: var(--success-color);
+            color: white;
+        }
+
+        .btn-warning {
+            background: var(--warning-color);
+            color: white;
+        }
+
+        .btn-danger {
+            background: var(--danger-color);
+            color: white;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+
+        .symbol-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .symbol-card {
+            background: rgba(255,255,255,0.05);
+            border-radius: 10px;
+            padding: 1.5rem;
+            border: 1px solid var(--border-color);
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .symbol-card:hover {
+            background: rgba(255,255,255,0.1);
+            transform: scale(1.02);
+        }
+
+        .symbol-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .symbol-name {
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: var(--secondary-color);
+        }
+
+        .signal-badge {
+            padding: 0.3rem 0.8rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .signal-long { background: var(--success-color); color: white; }
+        .signal-short { background: var(--danger-color); color: white; }
+        .signal-wait { background: var(--warning-color); color: white; }
+        .signal-no-signal { background: var(--border-color); color: white; }
+
+        .symbol-data {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .data-item {
+            text-align: center;
+        }
+
+        .data-label {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.3rem;
+        }
+
+        .data-value {
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+
+        .strength-bar {
+            width: 100%;
+            height: 8px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 0.5rem 0;
+        }
+
+        .strength-fill {
+            height: 100%;
+            transition: width 0.5s ease;
+            border-radius: 4px;
+        }
+
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .market-overview {
+            background: var(--card-bg);
+            border-radius: 15px;
+            padding: 1.5rem;
+            border: 1px solid var(--border-color);
+        }
+
+        .btc-price {
+            text-align: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .btc-price .price {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--warning-color);
+        }
+
+        .btc-price .change {
+            font-size: 1rem;
+            margin-top: 0.5rem;
+        }
+
+        .change.positive { color: var(--success-color); }
+        .change.negative { color: var(--danger-color); }
+
+        .philosophy-card {
+            background: linear-gradient(135deg, var(--info-color), var(--secondary-color));
+            color: white;
+            text-align: center;
+            position: relative;
+        }
+
+        .philosophy-card::before {
+            content: '"';
+            font-size: 4rem;
+            position: absolute;
+            top: -0.5rem;
+            left: 1rem;
+            opacity: 0.3;
+        }
+
+        .philosophy-text {
+            font-style: italic;
+            font-size: 1.1rem;
+            margin-bottom: 1rem;
+        }
+
+        .philosophy-author {
+            font-weight: 600;
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1rem;
+        }
+
+        .stat-item {
+            text-align: center;
+            padding: 1rem;
+            background: rgba(255,255,255,0.05);
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+        }
+
+        .stat-number {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--secondary-color);
+        }
+
+        .stat-label {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            margin-top: 0.3rem;
+        }
+
+        .risk-management {
+            background: rgba(231, 76, 60, 0.1);
+            border: 1px solid var(--danger-color);
+        }
+
+        .risk-allocation {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+
+        .allocation-item {
+            text-align: center;
+            padding: 0.5rem;
+            background: rgba(255,255,255,0.05);
+            border-radius: 5px;
+            font-size: 0.9rem;
+        }
+
+        .log-console {
+            background: #000;
+            color: #00ff00;
+            font-family: 'Courier New', monospace;
+            padding: 1rem;
+            border-radius: 8px;
+            height: 200px;
+            overflow-y: auto;
+            font-size: 0.8rem;
+            line-height: 1.4;
+        }
+
+        .log-entry {
+            margin-bottom: 0.3rem;
+        }
+
+        .log-timestamp {
+            color: #888;
+        }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid var(--border-color);
+            border-top: 2px solid var(--secondary-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 1rem 1.5rem;
+            border-radius: 8px;
+            color: white;
+            font-weight: 600;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            transform: translateX(400px);
+            transition: transform 0.3s ease;
+            z-index: 1000;
+        }
+
+        .notification.show {
+            transform: translateX(0);
+        }
+
+        .notification.success { background: var(--success-color); }
+        .notification.error { background: var(--danger-color); }
+        .notification.warning { background: var(--warning-color); }
+        .notification.info { background: var(--info-color); }
+
+        @media (max-width: 1024px) {
+            .main-container {
+                grid-template-columns: 1fr;
+                gap: 1rem;
+            }
+            
+            .sidebar {
+                order: -1;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .controls-section {
+                flex-direction: column;
+            }
+            
+            .symbol-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="header-content">
+            <h1><i class="fas fa-chart-line"></i> Jaime Merino Trading Bot</h1>
+            <p class="subtitle">Metodología Trading Latino - Análisis Técnico Avanzado</p>
+            <div class="philosophy-banner">
+                <i class="fas fa-quote-left"></i>
+                "El arte de tomar dinero de otros legalmente"
+                <i class="fas fa-quote-right"></i>
+            </div>
+        </div>
+    </header>
+
+    <div class="main-container">
+        <div class="content-area">
+            <!-- Control Panel -->
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">
+                        <i class="fas fa-cogs"></i>
+                        Panel de Control
+                    </h2>
+                    <div class="status-indicator">
+                        <span class="status-dot connected" id="connection-status"></span>
+                        <span id="connection-text">Conectado</span>
+                    </div>
+                </div>
+                
+                <div class="controls-section">
+                    <button class="btn btn-primary" id="analyze-all-btn">
+                        <i class="fas fa-chart-bar"></i>
+                        Analizar Todos
+                    </button>
+                    <button class="btn btn-success" id="btc-analysis-btn">
+                        <i class="fab fa-bitcoin"></i>
+                        Análisis BTC
+                    </button>
+                    <button class="btn btn-warning" id="philosophy-btn">
+                        <i class="fas fa-brain"></i>
+                        Filosofía Merino
+                    </button>
+                    <button class="btn btn-danger" id="clear-cache-btn">
+                        <i class="fas fa-trash"></i>
+                        Limpiar Cache
+                    </button>
+                </div>
+            </div>
+
+            <!-- Trading Signals -->
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">
+                        <i class="fas fa-signal"></i>
+                        Señales de Trading
+                    </h2>
+                    <div class="status-indicator">
+                        <span id="signals-count">0</span> señales activas
+                    </div>
+                </div>
+                
+                <div class="symbol-grid" id="symbols-container">
+                    <!-- Los símbolos se llenarán dinámicamente -->
+                </div>
+            </div>
+
+            <!-- Console Log -->
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">
+                        <i class="fas fa-terminal"></i>
+                        Log del Sistema
+                    </h2>
+                    <button class="btn btn-primary" id="clear-log-btn" style="padding: 0.3rem 0.8rem; font-size: 0.8rem;">
+                        <i class="fas fa-eraser"></i>
+                        Limpiar
+                    </button>
+                </div>
+                
+                <div class="log-console" id="log-console">
+                    <div class="log-entry">
+                        <span class="log-timestamp">[00:00:00]</span>
+                        Sistema iniciado - Metodología Jaime Merino cargada
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="sidebar">
+            <!-- Market Overview -->
+            <div class="market-overview">
+                <h3><i class="fas fa-globe"></i> Vista del Mercado</h3>
+                <div class="btc-price">
+                    <div class="price" id="btc-price">$0.00</div>
+                    <div class="change" id="btc-change">+0.00%</div>
+                </div>
+                
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <div class="stat-number" id="high-probability-count">0</div>
+                        <div class="stat-label">Alta Probabilidad</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-number" id="total-symbols">0</div>
+                        <div class="stat-label">Símbolos Monitoreados</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-number" id="connected-clients">0</div>
+                        <div class="stat-label">Clientes Conectados</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-number" id="server-uptime">00:00</div>
+                        <div class="stat-label">Tiempo Activo</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Philosophy Card -->
+            <div class="card philosophy-card">
+                <div class="philosophy-text" id="philosophy-text">
+                    "Es mejor perder una oportunidad que perder dinero"
+                </div>
+                <div class="philosophy-author">- Jaime Merino</div>
+            </div>
+
+            <!-- Risk Management -->
+            <div class="card risk-management">
+                <h3><i class="fas fa-shield-alt"></i> Gestión de Riesgo</h3>
+                <p style="margin-bottom: 1rem; font-size: 0.9rem;">
+                    Filosofía 40-30-20-10
+                </p>
+                
+                <div class="risk-allocation">
+                    <div class="allocation-item">
+                        <strong>40%</strong><br>
+                        BTC Largo Plazo
+                    </div>
+                    <div class="allocation-item">
+                        <strong>30%</strong><br>
+                        Gráficos Semanales
+                    </div>
+                    <div class="allocation-item">
+                        <strong>20%</strong><br>
+                        Trading Diario
+                    </div>
+                    <div class="allocation-item">
+                        <strong>10%</strong><br>
+                        Futuros
+                    </div>
+                </div>
+                
+                <div style="margin-top: 1rem; font-size: 0.8rem; color: var(--text-secondary);">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    Máximo 1% riesgo por operación
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification Container -->
+    <div id="notification-container"></div>
+
+    <!-- Socket.IO and Custom JS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <script>
+        // Global variables
+        let socket;
+        let connected = false;
+        let symbolsData = {};
+        let startTime = Date.now();
+        let philosophyQuotes = [
+            "El arte de tomar dinero de otros legalmente",
+            "Es mejor perder una oportunidad que perder dinero",
+            "Solo operamos con alta probabilidad de éxito",
+            "Operamos contra el 90% que pierde dinero",
+            "Disciplina > Análisis técnico perfecto"
+        ];
+        let currentQuoteIndex = 0;
+
+        // Initialize application
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeSocket();
+            setupEventListeners();
+            startPhilosophyRotation();
+            startUptimeCounter();
+        });
+
+        // Socket.IO initialization
+        function initializeSocket() {
+            socket = io();
+            
+            socket.on('connect', function() {
+                connected = true;
+                updateConnectionStatus(true);
+                logMessage('Conectado al servidor Jaime Merino', 'success');
+            });
+
+            socket.on('disconnect', function() {
+                connected = false;
+                updateConnectionStatus(false);
+                logMessage('Desconectado del servidor', 'error');
+            });
+
+            socket.on('merino_welcome', function(data) {
+                logMessage(`Metodología cargada: ${data.methodology}`, 'info');
+                showNotification(data.msg, 'success');
+                document.getElementById('total-symbols').textContent = data.symbols_available.length;
+            });
+
+            socket.on('merino_analysis_update', function(data) {
+                updateSymbolData(data.symbol, data.data);
+                if (data.high_probability) {
+                    showNotification(`🎯 ALTA PROBABILIDAD: ${data.symbol}`, 'warning');
+                    logMessage(`🎯 Señal alta probabilidad: ${data.symbol} - ${data.data.signal.signal} (${data.data.signal.signal_strength}%)`, 'success');
+                }
+            });
+
+            socket.on('btc_price_update', function(data) {
+                updateBTCPrice(data.price);
+            });
+
+            socket.on('market_sentiment', function(data) {
+                logMessage(`Sentimiento de mercado: ${data.sentiment}`, 'info');
+            });
+
+            socket.on('merino_server_status', function(data) {
+                updateServerStats(data);
+            });
+
+            socket.on('philosophy_reminder', function(data) {
+                showNotification(data.message, 'info');
+            });
+
+            socket.on('market_alert', function(data) {
+                showNotification(`🚨 ${data.message}`, 'warning');
+                logMessage(`Alerta: ${data.message}`, 'warning');
+            });
+
+            socket.on('merino_analysis_error', function(data) {
+                logMessage(`Error análisis ${data.symbol}: ${data.error}`, 'error');
+            });
+        }
+
+        // Event listeners setup
+        function setupEventListeners() {
+            document.getElementById('analyze-all-btn').addEventListener('click', function() {
+                socket.emit('request_all_merino_symbols');
+                this.innerHTML = '<span class="loading-spinner"></span> Analizando...';
+                setTimeout(() => {
+                    this.innerHTML = '<i class="fas fa-chart-bar"></i> Analizar Todos';
+                }, 3000);
+            });
+
+            document.getElementById('btc-analysis-btn').addEventListener('click', function() {
+                socket.emit('request_merino_analysis', {symbol: 'BTCUSDT'});
+                showNotification('Solicitando análisis de Bitcoin...', 'info');
+            });
+
+            document.getElementById('philosophy-btn').addEventListener('click', function() {
+                socket.emit('request_merino_philosophy');
+                showNotification('Cargando filosofía de Jaime Merino...', 'info');
+            });
+
+            document.getElementById('clear-cache-btn').addEventListener('click', function() {
+                symbolsData = {};
+                document.getElementById('symbols-container').innerHTML = '';
+                showNotification('Cache limpiado', 'success');
+            });
+
+            document.getElementById('clear-log-btn').addEventListener('click', function() {
+                document.getElementById('log-console').innerHTML = '';
+            });
+        }
+
+        // Update connection status
+        function updateConnectionStatus(isConnected) {
+            const statusDot = document.getElementById('connection-status');
+            const statusText = document.getElementById('connection-text');
+            
+            if (isConnected) {
+                statusDot.className = 'status-dot connected';
+                statusText.textContent = 'Conectado';
+            } else {
+                statusDot.className = 'status-dot disconnected';
+                statusText.textContent = 'Desconectado';
+            }
+        }
+
+        // Update symbol data
+        function updateSymbolData(symbol, data) {
+            symbolsData[symbol] = data;
+            renderSymbolCard(symbol, data);
+            updateHighProbabilityCount();
+        }
+
+        // Render symbol card
+        function renderSymbolCard(symbol, data) {
+            const container = document.getElementById('symbols-container');
+            let card = document.getElementById(`symbol-${symbol}`);
+            
+            if (!card) {
+                card = document.createElement('div');
+                card.id = `symbol-${symbol}`;
+                card.className = 'symbol-card animate__animated animate__fadeInUp';
+                container.appendChild(card);
+            }
+
+            const signal = data.signal || {};
+            const currentPrice = data.current_price || 0;
+            const signalType = signal.signal || 'NO_SIGNAL';
+            const signalStrength = signal.signal_strength || 0;
+
+            card.innerHTML = `
+                <div class="symbol-header">
+                    <div class="symbol-name">${symbol}</div>
+                    <div class="signal-badge signal-${signalType.toLowerCase().replace('_', '-')}">${signalType}</div>
+                </div>
+                <div class="symbol-data">
+                    <div class="data-item">
+                        <div class="data-label">Precio</div>
+                        <div class="data-value">${currentPrice.toLocaleString()}</div>
+                    </div>
+                    <div class="data-item">
+                        <div class="data-label">Fuerza</div>
+                        <div class="data-value">${signalStrength}%</div>
+                    </div>
+                </div>
+                <div class="strength-bar">
+                    <div class="strength-fill" style="width: ${signalStrength}%; background: ${getStrengthColor(signalStrength)};"></div>
+                </div>
+                <div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.5rem;">
+                    Confluencias: ${signal.confluence_score || 0}/4
+                </div>
+            `;
+        }
+
+        // Get strength color
+        function getStrengthColor(strength) {
+            if (strength >= 70) return 'var(--success-color)';
+            if (strength >= 50) return 'var(--warning-color)';
+            return 'var(--danger-color)';
+        }
+
+        // Update BTC price
+        function updateBTCPrice(price) {
+            const priceElement = document.getElementById('btc-price');
+            const changeElement = document.getElementById('btc-change');
+            
+            if (priceElement) {
+                const oldPrice = parseFloat(priceElement.textContent.replace(/[^0-9.]/g, ''));
+                priceElement.textContent = `${price.toLocaleString()}`;
+                
+                if (oldPrice && price !== oldPrice) {
+                    const change = ((price - oldPrice) / oldPrice) * 100;
+                    changeElement.textContent = `${change >= 0 ? '+' : ''}${change.toFixed(2)}%`;
+                    changeElement.className = `change ${change >= 0 ? 'positive' : 'negative'}`;
+                }
+            }
+        }
+
+        // Update high probability count
+        function updateHighProbabilityCount() {
+            let count = 0;
+            Object.values(symbolsData).forEach(data => {
+                const strength = data.signal?.signal_strength || 0;
+                if (strength >= 50) count++;
+            });
+            document.getElementById('high-probability-count').textContent = count;
+        }
+
+        // Update server stats
+        function updateServerStats(data) {
+            document.getElementById('connected-clients').textContent = data.connected_clients || 0;
+            document.getElementById('high-probability-count').textContent = data.high_probability_signals || 0;
+            document.getElementById('total-symbols').textContent = data.supported_symbols?.length || 0;
+        }
+
+        // Log message
+        function logMessage(message, type = 'info') {
+            const console = document.getElementById('log-console');
+            const timestamp = new Date().toLocaleTimeString();
+            const icons = {
+                'success': '✅',
+                'error': '❌',
+                'warning': '⚠️',
+                'info': '📊'
+            };
+            
+            const logEntry = document.createElement('div');
+            logEntry.className = 'log-entry';
+            logEntry.innerHTML = `
+                <span class="log-timestamp">[${timestamp}]</span>
+                ${icons[type] || '📊'} ${message}
+            `;
+            
+            console.appendChild(logEntry);
+            console.scrollTop = console.scrollHeight;
+            
+            // Keep only last 100 entries
+            while (console.children.length > 100) {
+                console.removeChild(console.firstChild);
+            }
+        }
+
+        // Show notification
+        function showNotification(message, type = 'info') {
+            const container = document.getElementById('notification-container');
+            const notification = document.createElement('div');
+            notification.className = `notification ${type}`;
+            notification.innerHTML = `
+                <i class="fas fa-${getNotificationIcon(type)}"></i>
+                ${message}
+            `;
+            
+            container.appendChild(notification);
+            
+            // Show notification
+            setTimeout(() => {
+                notification.classList.add('show');
+            }, 100);
+            
+            // Hide and remove notification
+            setTimeout(() => {
+                notification.classList.remove('show');
+                setTimeout(() => {
+                    container.removeChild(notification);
+                }, 300);
+            }, 4000);
+        }
+
+        // Get notification icon
+        function getNotificationIcon(type) {
+            const icons = {
+                'success': 'check-circle',
+                'error': 'exclamation-circle',
+                'warning': 'exclamation-triangle',
+                'info': 'info-circle'
+            };
+            return icons[type] || 'info-circle';
+        }
+
+        // Start philosophy rotation
+        function startPhilosophyRotation() {
+            setInterval(() => {
+                currentQuoteIndex = (currentQuoteIndex + 1) % philosophyQuotes.length;
+                const philosophyElement = document.getElementById('philosophy-text');
+                philosophyElement.style.opacity = '0';
+                
+                setTimeout(() => {
+                    philosophyElement.textContent = `"${philosophyQuotes[currentQuoteIndex]}"`;
+                    philosophyElement.style.opacity = '1';
+                }, 300);
+            }, 8000);
+        }
+
+        // Start uptime counter
+        function startUptimeCounter() {
+            setInterval(() => {
+                const uptime = Date.now() - startTime;
+                const hours = Math.floor(uptime / (1000 * 60 * 60));
+                const minutes = Math.floor((uptime % (1000 * 60 * 60)) / (1000 * 60));
+                document.getElementById('server-uptime').textContent = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+            }, 60000);
+        }
+
+        // Request server status periodically
+        setInterval(() => {
+            if (connected) {
+                socket.emit('get_merino_server_status');
+            }
+        }, 30000);
+
+        // Initial server status request
+        setTimeout(() => {
+            if (connected) {
+                socket.emit('get_merino_server_status');
+            }
+        }, 2000);
+    </script>
+</body>
+</html>
