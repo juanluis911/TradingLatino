@@ -4,7 +4,7 @@ Servicio de análisis mejorado implementando la metodología completa de Jaime M
 from datetime import datetime
 from typing import Optional, Dict
 from services.binance_service import binance_service
-from services.enhanced_indicators import jaime_merino_signal_generator
+#from services.enhanced_indicators import jaime_merino_signal_generator
 from models.trading_analysis import TradingAnalysis, create_analysis
 from utils.logger import analysis_logger
 from config import Config

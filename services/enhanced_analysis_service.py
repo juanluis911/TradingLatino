@@ -1,13 +1,14 @@
 """
 Servicio de análisis mejorado implementando la metodología completa de Jaime Merino
 """
+import pandas as pd  # ← NUEVO
 from datetime import datetime
 from typing import Optional, Dict
 from services.binance_service import binance_service
-from services.enhanced_indicators import jaime_merino_signal_generator
+# from services.enhanced_indicators import jaime_merino_signal_generator  # ← COMENTADA
 from models.trading_analysis import TradingAnalysis, create_analysis
 from utils.logger import analysis_logger
-from config import Config
+from enhanced_config import MerinoConfig  # ← También cambiar esto si está usando Config
 
 logger = analysis_logger
 
@@ -19,7 +20,7 @@ class EnhancedAnalysisService:
     def __init__(self):
         """Inicializa el servicio de análisis mejorado"""
         self.binance = binance_service
-        self.merino_generator = jaime_merino_signal_generator
+        #self.merino_generator = jaime_merino_signal_generator
         logger.info("🚀 Servicio de análisis mejorado inicializado - Metodología Jaime Merino")
     
     def analyze_symbol_merino(self, symbol: str) -> Optional[Dict]:

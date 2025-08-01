@@ -224,7 +224,7 @@ def install_dependencies():
         print(f"   ✅ pip detectado: {result.stdout.strip()}")
         
         # Verificar si requirements.txt existe
-        if not Path('requirements.txt').exists():
+        if not Path('enhanced_requirements.txt').exists():
             print("   ⚠️ requirements.txt no encontrado")
             create_basic_requirements()
         
