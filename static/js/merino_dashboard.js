@@ -166,81 +166,145 @@
         }
 
         // Actualizar sección de futuros
-        function updateFuturesSection(symbol, data) {
+       function updateFuturesSection(symbol, data) {
+            console.log(`🔍 Actualizando futuros para ${symbol}:`, data);
+            
             const futuresSection = document.getElementById(`futures-${symbol}`);
             const tradingLevels = data.trading_levels;
             const signal = data.signal || {};
 
-            if (futuresSection && tradingLevels && signal.signal !== 'NO_SIGNAL' && signal.signal !== 'LOADING') {
-                futuresSection.style.display = 'block';
+            // Debug: Verificar estructura de datos
+            console.log(`📊 Trading levels para ${symbol}:`, tradingLevels);
+            console.log(`🎯 Signal para ${symbol}:`, signal);
 
-                // Actualizar entrada
-                const entryOptimal = document.getElementById(`entry-optimal-${symbol}`);
-                const entryRange = document.getElementById(`entry-range-${symbol}`);
+            if (!futuresSection) {
+                console.warn(`❌ No se encontró futures-${symbol}`);
+                return;
+            }
 
-                if (entryOptimal) entryOptimal.textContent = `${tradingLevels.entry_optimal?.toFixed(2) || '0.00'}`;
-                if (entryRange && tradingLevels.entry_range) {
-                    entryRange.textContent = `${tradingLevels.entry_range.low?.toFixed(2)} - ${tradingLevels.entry_range.high?.toFixed(2)}`;
+            if (!tradingLevels) {
+                console.warn(`❌ No hay trading_levels para ${symbol}`);
+                return;
+            }
+
+            if (signal.signal === 'NO_SIGNAL' || signal.signal === 'LOADING') {
+                console.log(`⏳ Señal no válida para ${symbol}: ${signal.signal}`);
+                futuresSection.style.display = 'none';
+                return;
+            }
+
+            // Mostrar sección de futuros
+            futuresSection.style.display = 'block';
+
+            // ✅ ACTUALIZAR ENTRADA - Versión corregida con fallbacks
+            const entryOptimal = document.getElementById(`entry-optimal-${symbol}`);
+            const entryRange = document.getElementById(`entry-range-${symbol}`);
+
+            if (entryOptimal) {
+                const optimalValue = tradingLevels.entry_optimal;
+                if (optimalValue !== undefined && optimalValue !== null) {
+                    entryOptimal.textContent = `${optimalValue.toFixed(2)}`;
+                    console.log(`✅ Entrada optimal ${symbol}: ${optimalValue.toFixed(2)}`);
+                } else {
+                    entryOptimal.textContent = '0.00';
+                    console.warn(`⚠️ entry_optimal indefinido para ${symbol}`);
                 }
+            } else {
+                console.warn(`❌ Elemento entry-optimal-${symbol} no encontrado`);
+            }
 
-                // Actualizar targets
-                const targetsContainer = document.getElementById(`targets-${symbol}`);
-                if (targetsContainer && tradingLevels.targets) {
-                    targetsContainer.innerHTML = '';
-                    tradingLevels.targets.forEach((target, index) => {
+            if (entryRange && tradingLevels.entry_range) {
+                const rangeLow = tradingLevels.entry_range.low;
+                const rangeHigh = tradingLevels.entry_range.high;
+                
+                if (rangeLow !== undefined && rangeHigh !== undefined) {
+                    entryRange.textContent = `${rangeLow.toFixed(2)} - ${rangeHigh.toFixed(2)}`;
+                    console.log(`✅ Rango entrada ${symbol}: ${rangeLow.toFixed(2)} - ${rangeHigh.toFixed(2)}`);
+                } else {
+                    entryRange.textContent = '0.00 - 0.00';
+                    console.warn(`⚠️ entry_range indefinido para ${symbol}`);
+                }
+            } else {
+                console.warn(`❌ Elemento entry-range-${symbol} no encontrado o sin entry_range`);
+            }
+
+            // ✅ ACTUALIZAR TARGETS - Versión mejorada
+            const targetsContainer = document.getElementById(`targets-${symbol}`);
+            if (targetsContainer && tradingLevels.targets && Array.isArray(tradingLevels.targets)) {
+                targetsContainer.innerHTML = '';
+                
+                tradingLevels.targets.forEach((target, index) => {
+                    if (target !== undefined && target !== null) {
                         const targetDiv = document.createElement('div');
-                        targetDiv.className = 'target-item';
+                        targetDiv.className = 'target-level';
                         targetDiv.innerHTML = `
-                            <div>
-                                <span style="font-weight: 600;">Target ${index + 1}:</span>
-                                <span class="level-value price-target">${target.level?.toFixed(2) || '0.00'}</span>
-                            </div>
-                            <div>
-                                <span class="percentage positive">+${target.percentage || 0}%</span>
-                            </div>
+                            <span class="target-label">T${index + 1}:</span>
+                            <span class="target-value">${target.toFixed(2)}</span>
                         `;
                         targetsContainer.appendChild(targetDiv);
-                    });
-                }
-
-                // Actualizar stop loss
-                const stopPrice = document.getElementById(`stop-price-${symbol}`);
-                const stopPercentage = document.getElementById(`stop-percentage-${symbol}`);
-
-                if (stopPrice && tradingLevels.stop_loss) {
-                    stopPrice.textContent = `${tradingLevels.stop_loss.price?.toFixed(2) || '0.00'}`;
-                }
-                if (stopPercentage && tradingLevels.stop_loss) {
-                    stopPercentage.textContent = `-${tradingLevels.stop_loss.percentage?.toFixed(2) || '0.00'}%`;
-                }
-
-                // Actualizar gestión de posición
-                const positionSize = document.getElementById(`position-size-${symbol}`);
-                const leverage = document.getElementById(`leverage-${symbol}`);
-                const riskReward = document.getElementById(`risk-reward-${symbol}`);
-
-                if (positionSize) positionSize.textContent = `${tradingLevels.position_size_pct || 0}%`;
-                if (leverage && tradingLevels.leverage) {
-                    leverage.textContent = `1:${tradingLevels.leverage.recommended || 1}`;
-                }
-                if (riskReward) riskReward.textContent = `1:${tradingLevels.risk_reward || 0}`;
-
-                // Actualizar invalidación
-                const invalidationLevel = document.getElementById(`invalidation-level-${symbol}`);
-                const invalidationReason = document.getElementById(`invalidation-reason-${symbol}`);
-
-                if (invalidationLevel && tradingLevels.invalidation) {
-                    invalidationLevel.textContent = `${tradingLevels.invalidation.level?.toFixed(2) || '0.00'}`;
-                }
-                if (invalidationReason && tradingLevels.invalidation) {
-                    invalidationReason.textContent = tradingLevels.invalidation.reason || 'Sin información';
-                }
-
-            } else if (futuresSection) {
-                futuresSection.style.display = 'none';
+                        console.log(`✅ Target ${index + 1} ${symbol}: ${target.toFixed(2)}`);
+                    }
+                });
+            } else {
+                console.warn(`❌ Elemento targets-${symbol} no encontrado o targets inválidos`);
             }
+
+            // ✅ ACTUALIZAR STOP LOSS
+            const stopLoss = document.getElementById(`stop-loss-${symbol}`);
+            if (stopLoss && tradingLevels.stop_loss !== undefined) {
+                stopLoss.textContent = `${tradingLevels.stop_loss.toFixed(2)}`;
+                console.log(`✅ Stop loss ${symbol}: ${tradingLevels.stop_loss.toFixed(2)}`);
+            } else {
+                console.warn(`❌ Elemento stop-loss-${symbol} no encontrado o stop_loss indefinido`);
+            }
+
+            // ✅ ACTUALIZAR INFORMACIÓN ADICIONAL
+            const positionSize = document.getElementById(`position-size-${symbol}`);
+            if (positionSize && tradingLevels.position_size_pct !== undefined) {
+                positionSize.textContent = `${tradingLevels.position_size_pct.toFixed(1)}%`;
+            }
+
+            const leverage = document.getElementById(`leverage-${symbol}`);
+            if (leverage && tradingLevels.leverage && tradingLevels.leverage.recommended !== undefined) {
+                leverage.textContent = `${tradingLevels.leverage.recommended.toFixed(1)}x`;
+            }
+
+            const riskReward = document.getElementById(`risk-reward-${symbol}`);
+            if (riskReward && tradingLevels.risk_reward !== undefined) {
+                riskReward.textContent = `1:${tradingLevels.risk_reward.toFixed(1)}`;
+            }
+
+            console.log(`✅ Sección de futuros actualizada para ${symbol}`);
         }
 
+        function debugTradingData(symbol) {
+            console.log("=== DEBUG TRADING DATA ===");
+            console.log(`Símbolo: ${symbol}`);
+            
+            const data = analysisData[symbol];
+            if (!data) {
+                console.error(`❌ No hay datos para ${symbol}`);
+                return;
+            }
+
+            console.log("Estructura completa:", data);
+            console.log("Trading levels:", data.trading_levels);
+            console.log("Signal:", data.signal);
+            
+            // Verificar elementos DOM
+            const elements = [
+                `entry-optimal-${symbol}`,
+                `entry-range-${symbol}`,
+                `targets-${symbol}`,
+                `stop-loss-${symbol}`,
+                `futures-${symbol}`
+            ];
+
+            elements.forEach(elementId => {
+                const element = document.getElementById(elementId);
+                console.log(`Elemento ${elementId}:`, element ? "✅ Existe" : "❌ No existe");
+            });
+        }
         // Actualizar estadísticas globales
         function updateGlobalStats() {
             const symbols = Object.keys(analysisData);
