@@ -138,10 +138,11 @@ def background_worker():
 @app.route('/')
 def home():
     """Página principal"""
+    global trading_data
+    
     try:
         # Generar datos iniciales si no existen
         if not trading_data:
-            global trading_data
             trading_data = generate_trading_data()
         
         return render_template('index.html', 
@@ -178,8 +179,9 @@ def health():
 @app.route('/api/data')
 def api_data():
     """API de datos"""
+    global trading_data
+    
     if not trading_data:
-        global trading_data
         trading_data = generate_trading_data()
     
     return jsonify({
