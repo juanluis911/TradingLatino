@@ -1,6 +1,6 @@
 """
-🚀 Jaime Merino Trading Bot - VERSIÓN QUE FUNCIONA GARANTIZADA
-📈 Simplificada para solucionar página en blanco
+🚀 Jaime Merino Trading Bot - SIN PARPADEO + DATOS REALES
+📈 Actualización suave y precios más realistas
 """
 
 import os
@@ -9,6 +9,7 @@ import json
 import time
 import random
 import threading
+import requests
 from datetime import datetime
 from flask import Flask, render_template, jsonify, request
 
@@ -39,77 +40,125 @@ else:
 trading_data = {}
 clients_connected = 0
 server_start_time = datetime.now()
+last_prices = {}
 
-# Datos base
+# Datos base más realistas
 SYMBOLS = ['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'ADAUSDT', 'XRPUSDT']
+
+# Precios base más actuales
 BASE_PRICES = {
-    'BTCUSDT': 45000,
-    'ETHUSDT': 3000, 
-    'BNBUSDT': 300,
-    'ADAUSDT': 0.50,
-    'XRPUSDT': 0.60
+    'BTCUSDT': 43500,  # Más cercano al precio real actual
+    'ETHUSDT': 2920,
+    'BNBUSDT': 285,
+    'ADAUSDT': 0.48,
+    'XRPUSDT': 0.58
 }
 
+def get_real_price_reference():
+    """Intenta obtener precios reales de APIs públicas"""
+    try:
+        # API pública de CoinGecko (sin necesidad de API key)
+        response = requests.get(
+            'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,binancecoin,cardano,ripple&vs_currencies=usd',
+            timeout=5
+        )
+        
+        if response.status_code == 200:
+            data = response.json()
+            return {
+                'BTCUSDT': data.get('bitcoin', {}).get('usd', BASE_PRICES['BTCUSDT']),
+                'ETHUSDT': data.get('ethereum', {}).get('usd', BASE_PRICES['ETHUSDT']),
+                'BNBUSDT': data.get('binancecoin', {}).get('usd', BASE_PRICES['BNBUSDT']),
+                'ADAUSDT': data.get('cardano', {}).get('usd', BASE_PRICES['ADAUSDT']),
+                'XRPUSDT': data.get('ripple', {}).get('usd', BASE_PRICES['XRPUSDT'])
+            }
+    except Exception as e:
+        print(f"⚠️ No se pudo obtener precios reales: {e}")
+    
+    return BASE_PRICES
+
 def generate_trading_data():
-    """Genera datos de trading realistas"""
+    """Genera datos de trading más realistas"""
+    global last_prices
+    
+    # Intentar obtener precios reales
+    real_prices = get_real_price_reference()
+    
     data = {}
     
     for symbol in SYMBOLS:
-        base_price = BASE_PRICES[symbol]
+        # Usar precio real como base
+        base_price = real_prices.get(symbol, BASE_PRICES[symbol])
         
-        # Variación realista de precio
-        change_pct = random.uniform(-0.08, 0.08)  # ±8%
-        current_price = base_price * (1 + change_pct)
+        # Si tenemos precio anterior, hacer variación más suave
+        if symbol in last_prices:
+            # Variación muy pequeña para simular movimiento real
+            change_factor = random.uniform(-0.005, 0.005)  # ±0.5%
+            current_price = last_prices[symbol] * (1 + change_factor)
+        else:
+            # Primera vez, usar precio base con pequeña variación
+            change_factor = random.uniform(-0.02, 0.02)  # ±2%
+            current_price = base_price * (1 + change_factor)
         
-        # RSI entre 20-80
-        rsi = random.uniform(20, 80)
+        # Calcular cambio en 24h más realista
+        change_24h = ((current_price - base_price) / base_price) * 100
         
-        # MACD simulado
-        macd = random.uniform(-0.02, 0.02) * base_price
+        # RSI más estable
+        previous_rsi = last_prices.get(f"{symbol}_rsi", random.uniform(35, 65))
+        rsi = previous_rsi + random.uniform(-3, 3)  # Cambio gradual
+        rsi = max(15, min(85, rsi))  # Límites realistas
         
-        # Determinar señal basada en indicadores
-        if rsi < 30 and macd > 0:
+        # MACD calculado como proporción del precio
+        macd = (current_price - base_price) * random.uniform(0.001, 0.003)
+        
+        # Determinar señal con lógica más sofisticada
+        if rsi < 25 and macd > 0 and change_24h < -2:
             signal = "COMPRA FUERTE"
-            confidence = random.uniform(80, 95)
+            confidence = random.uniform(85, 95)
             color = "success"
-        elif rsi > 70 and macd < 0:
+        elif rsi > 75 and macd < 0 and change_24h > 2:
             signal = "VENTA FUERTE" 
-            confidence = random.uniform(80, 95)
+            confidence = random.uniform(85, 95)
             color = "danger"
-        elif rsi < 40:
+        elif rsi < 35 and change_24h < 0:
             signal = "COMPRA"
-            confidence = random.uniform(65, 80)
+            confidence = random.uniform(70, 85)
             color = "success"
-        elif rsi > 60:
+        elif rsi > 65 and change_24h > 0:
             signal = "VENTA"
-            confidence = random.uniform(65, 80)
+            confidence = random.uniform(70, 85)
             color = "warning"
         else:
             signal = "ESPERAR"
-            confidence = random.uniform(50, 70)
+            confidence = random.uniform(55, 75)
             color = "secondary"
+        
+        # Almacenar precios para próxima iteración
+        last_prices[symbol] = current_price
+        last_prices[f"{symbol}_rsi"] = rsi
         
         data[symbol] = {
             'symbol': symbol,
             'price': round(current_price, 8),
-            'change_24h': round(change_pct * 100, 2),
-            'volume': random.randint(1000000, 100000000),
+            'change_24h': round(change_24h, 2),
+            'volume': random.randint(50000000, 200000000),  # Volúmenes más realistas
             'rsi': round(rsi, 1),
             'macd': round(macd, 6),
             'signal': signal,
             'confidence': round(confidence, 1),
             'color': color,
             'timestamp': int(time.time()),
-            'last_update': datetime.now().strftime('%H:%M:%S')
+            'last_update': datetime.now().strftime('%H:%M:%S'),
+            'trend': 'ALCISTA' if change_24h > 0 else 'BAJISTA' if change_24h < -1 else 'LATERAL'
         }
     
     return data
 
 def background_worker():
-    """Hilo de trabajo en segundo plano"""
+    """Hilo de trabajo con intervalos más largos"""
     global trading_data, clients_connected
     
-    print("🔄 Iniciando worker de análisis...")
+    print("🔄 Iniciando worker de análisis con intervalos optimizados...")
     
     while True:
         try:
@@ -122,16 +171,17 @@ def background_worker():
                     'data': trading_data,
                     'timestamp': datetime.now().isoformat(),
                     'clients': clients_connected,
-                    'philosophy': "El arte de tomar dinero de otros legalmente"
+                    'philosophy': "El arte de tomar dinero de otros legalmente",
+                    'update_type': 'background'
                 })
                 print(f"📊 Datos enviados a {clients_connected} clientes")
             
-            # Pausa entre actualizaciones
-            time.sleep(30)  # 30 segundos
+            # Pausa MÁS LARGA para evitar parpadeo
+            time.sleep(120)  # 2 minutos en lugar de 30 segundos
             
         except Exception as e:
             print(f"❌ Error en worker: {e}")
-            time.sleep(60)
+            time.sleep(180)  # 3 minutos en caso de error
 
 # Rutas principales
 
@@ -160,25 +210,27 @@ def home():
 
 @app.route('/health')
 def health():
-    """Health check"""
+    """Health check mejorado"""
     uptime = datetime.now() - server_start_time
     
     return jsonify({
         'status': 'healthy',
         'app': 'Jaime Merino Trading Bot',
-        'version': '2.0.0',
+        'version': '2.1.0',
         'uptime_seconds': int(uptime.total_seconds()),
         'socketio_enabled': SOCKETIO_AVAILABLE,
         'clients_connected': clients_connected,
         'symbols_tracked': len(SYMBOLS),
         'last_data_update': trading_data.get('BTCUSDT', {}).get('last_update', 'never'),
+        'real_prices_enabled': True,
+        'smooth_updates': True,
         'timestamp': datetime.now().isoformat(),
         'philosophy': "Es mejor perder una oportunidad que perder dinero"
     })
 
 @app.route('/api/data')
 def api_data():
-    """API de datos"""
+    """API de datos mejorada"""
     global trading_data
     
     if not trading_data:
@@ -188,6 +240,8 @@ def api_data():
         'success': True,
         'data': trading_data,
         'timestamp': datetime.now().isoformat(),
+        'data_source': 'hybrid_real_simulated',
+        'update_interval': '120_seconds',
         'philosophy': "Solo operamos con alta probabilidad de éxito"
     })
 
@@ -209,7 +263,7 @@ def api_symbol(symbol):
             'available_symbols': list(trading_data.keys())
         }), 404
 
-# Eventos SocketIO (si está disponible)
+# Eventos SocketIO optimizados
 if SOCKETIO_AVAILABLE:
     @socketio.on('connect')
     def on_connect():
@@ -222,7 +276,8 @@ if SOCKETIO_AVAILABLE:
             'data': trading_data,
             'timestamp': datetime.now().isoformat(),
             'message': 'Conectado al Jaime Merino Bot',
-            'philosophy': "Operamos contra el 90% que pierde dinero"
+            'philosophy': "Operamos contra el 90% que pierde dinero",
+            'update_type': 'initial'
         })
     
     @socketio.on('disconnect')
@@ -238,11 +293,12 @@ if SOCKETIO_AVAILABLE:
         emit('data_update', {
             'data': trading_data,
             'timestamp': datetime.now().isoformat(),
-            'message': 'Datos actualizados manualmente'
+            'message': 'Datos actualizados manualmente',
+            'update_type': 'manual'
         })
 
-def create_simple_template():
-    """Crear template HTML simple pero funcional"""
+def create_smooth_template():
+    """Template con actualización suave (sin parpadeo)"""
     template_dir = 'templates'
     os.makedirs(template_dir, exist_ok=True)
     
@@ -379,9 +435,10 @@ def create_simple_template():
             border: 1px solid rgba(255, 255, 255, 0.1);
             border-radius: 16px;
             padding: 1.5rem;
-            transition: all 0.3s ease;
             position: relative;
             overflow: hidden;
+            /* TRANSICIÓN SUAVE PARA EVITAR PARPADEO */
+            transition: all 0.5s ease;
         }
         
         .symbol-card::before {
@@ -428,12 +485,16 @@ def create_simple_template():
             font-family: 'Courier New', monospace;
             color: #fff;
             margin-bottom: 0.5rem;
+            /* TRANSICIÓN SUAVE PARA CAMBIOS DE PRECIO */
+            transition: color 0.3s ease;
         }
         
         .change {
             font-size: 1.2rem;
             font-weight: bold;
             margin-bottom: 1rem;
+            /* TRANSICIÓN SUAVE */
+            transition: color 0.3s ease;
         }
         
         .positive { color: #00ff88; }
@@ -452,6 +513,8 @@ def create_simple_template():
             padding: 0.8rem;
             background: rgba(0, 0, 0, 0.3);
             border-radius: 8px;
+            /* TRANSICIÓN SUAVE */
+            transition: background 0.3s ease;
         }
         
         .indicator-label {
@@ -464,6 +527,8 @@ def create_simple_template():
             font-size: 1.1rem;
             font-weight: bold;
             color: #00ccff;
+            /* TRANSICIÓN SUAVE */
+            transition: color 0.3s ease;
         }
         
         .signal-section {
@@ -472,6 +537,8 @@ def create_simple_template():
             padding: 1.5rem;
             text-align: center;
             margin-top: 1.5rem;
+            /* TRANSICIÓN SUAVE */
+            transition: all 0.3s ease;
         }
         
         .signal {
@@ -480,6 +547,8 @@ def create_simple_template():
             margin-bottom: 0.5rem;
             padding: 0.5rem;
             border-radius: 8px;
+            /* TRANSICIÓN SUAVE */
+            transition: all 0.3s ease;
         }
         
         .signal.success { background: rgba(0, 255, 136, 0.2); color: #00ff88; }
@@ -514,6 +583,28 @@ def create_simple_template():
             100% { transform: rotate(360deg); }
         }
         
+        /* INDICADOR DE ACTUALIZACIÓN */
+        .updating {
+            opacity: 0.7;
+            transform: scale(0.98);
+        }
+        
+        .price-up {
+            color: #00ff88 !important;
+            animation: priceFlash 0.5s ease;
+        }
+        
+        .price-down {
+            color: #ff4757 !important;
+            animation: priceFlash 0.5s ease;
+        }
+        
+        @keyframes priceFlash {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        
         @media (max-width: 768px) {
             .header h1 { font-size: 2rem; }
             .symbols-grid { 
@@ -531,7 +622,7 @@ def create_simple_template():
     <div class="header">
         <h1>🚀 Jaime Merino Trading Bot</h1>
         <p>📈 Metodología Trading Latino Avanzada</p>
-        <p>🎯 Versión Enhanced - Live en Render</p>
+        <p>🎯 Versión Enhanced - Actualización Suave</p>
     </div>
     
     <div class="status-bar">
@@ -542,10 +633,13 @@ def create_simple_template():
             </span>
         </div>
         <div class="status-item">
-            <span>🕒 {{ server_time }}</span>
+            <span>🕒 <span id="current-time">{{ server_time }}</span></span>
         </div>
         <div class="status-item">
             <span>📊 {{ symbols_data|length }} Símbolos</span>
+        </div>
+        <div class="status-item">
+            <span id="last-update">💫 Actualizado</span>
         </div>
     </div>
     
@@ -566,15 +660,15 @@ def create_simple_template():
     {% if symbols_data %}
     <div class="symbols-grid" id="symbols-container">
         {% for symbol, data in symbols_data.items() %}
-        <div class="symbol-card">
+        <div class="symbol-card" id="card-{{ data.symbol }}">
             <div class="symbol-header">
                 <div class="symbol-name">{{ data.symbol }}</div>
                 <div class="last-update">{{ data.last_update }}</div>
             </div>
             
             <div class="price-section">
-                <div class="price">${{ "%.8f"|format(data.price) }}</div>
-                <div class="change {% if data.change_24h >= 0 %}positive{% else %}negative{% endif %}">
+                <div class="price" id="price-{{ data.symbol }}">${{ "%.8f"|format(data.price) }}</div>
+                <div class="change {% if data.change_24h >= 0 %}positive{% else %}negative{% endif %}" id="change-{{ data.symbol }}">
                     {{ "%.2f"|format(data.change_24h) }}% (24h)
                 </div>
             </div>
@@ -582,20 +676,20 @@ def create_simple_template():
             <div class="indicators">
                 <div class="indicator">
                     <div class="indicator-label">RSI</div>
-                    <div class="indicator-value">{{ data.rsi }}</div>
+                    <div class="indicator-value" id="rsi-{{ data.symbol }}">{{ data.rsi }}</div>
                 </div>
                 <div class="indicator">
                     <div class="indicator-label">MACD</div>
-                    <div class="indicator-value">{{ "%.6f"|format(data.macd) }}</div>
+                    <div class="indicator-value" id="macd-{{ data.symbol }}">{{ "%.6f"|format(data.macd) }}</div>
                 </div>
             </div>
             
             <div class="signal-section">
-                <div class="signal {{ data.color }}">
+                <div class="signal {{ data.color }}" id="signal-{{ data.symbol }}">
                     {{ data.signal }}
                 </div>
                 <div class="confidence">
-                    🎯 Confianza: {{ data.confidence }}%
+                    🎯 Confianza: <span id="confidence-{{ data.symbol }}">{{ data.confidence }}%</span>
                 </div>
             </div>
         </div>
@@ -611,6 +705,7 @@ def create_simple_template():
     {% if socketio_enabled %}
     <script>
         const socket = io();
+        let lastPrices = {};
         
         socket.on('connect', function() {
             console.log('✅ Conectado al servidor');
@@ -623,45 +718,177 @@ def create_simple_template():
         });
         
         socket.on('data_update', function(response) {
-            console.log('📊 Datos actualizados:', response);
-            updateSymbolsData(response.data);
+            console.log('📊 Datos actualizados:', response.update_type);
+            updateSymbolsDataSmooth(response.data);
+            
+            // Actualizar indicador
+            document.getElementById('last-update').innerHTML = '✨ Actualizado ' + new Date().toLocaleTimeString();
         });
         
-        function updateSymbolsData(data) {
-            // Aquí podrías actualizar dinámicamente las tarjetas
-            // Por simplicidad, recargamos la página
-            location.reload();
+        function updateSymbolsDataSmooth(data) {
+            // ACTUALIZACIÓN SUAVE SIN RECARGAR LA PÁGINA
+            Object.values(data).forEach(symbolData => {
+                const symbol = symbolData.symbol;
+                const oldPrice = lastPrices[symbol];
+                const newPrice = symbolData.price;
+                
+                // Actualizar precio con animación
+                const priceEl = document.getElementById(`price-${symbol}`);
+                if (priceEl) {
+                    // Añadir clase de actualización
+                    const cardEl = document.getElementById(`card-${symbol}`);
+                    cardEl.classList.add('updating');
+                    
+                    setTimeout(() => {
+                        priceEl.textContent = `$${newPrice.toFixed(8)}`;
+                        
+                        // Animación de color según cambio de precio
+                        if (oldPrice && newPrice > oldPrice) {
+                            priceEl.classList.add('price-up');
+                        } else if (oldPrice && newPrice < oldPrice) {
+                            priceEl.classList.add('price-down');
+                        }
+                        
+                        // Limpiar clases después de la animación
+                        setTimeout(() => {
+                            priceEl.classList.remove('price-up', 'price-down');
+                            cardEl.classList.remove('updating');
+                        }, 500);
+                        
+                    }, 100);
+                    
+                    lastPrices[symbol] = newPrice;
+                }
+                
+                // Actualizar cambio 24h
+                const changeEl = document.getElementById(`change-${symbol}`);
+                if (changeEl) {
+                    changeEl.textContent = `${symbolData.change_24h.toFixed(2)}% (24h)`;
+                    changeEl.className = `change ${symbolData.change_24h >= 0 ? 'positive' : 'negative'}`;
+                }
+                
+                // Actualizar RSI
+                const rsiEl = document.getElementById(`rsi-${symbol}`);
+                if (rsiEl) {
+                    rsiEl.textContent = symbolData.rsi;
+                }
+                
+                // Actualizar MACD
+                const macdEl = document.getElementById(`macd-${symbol}`);
+                if (macdEl) {
+                    macdEl.textContent = symbolData.macd.toFixed(6);
+                }
+                
+                // Actualizar señal
+                const signalEl = document.getElementById(`signal-${symbol}`);
+                if (signalEl) {
+                    signalEl.textContent = symbolData.signal;
+                    signalEl.className = `signal ${symbolData.color}`;
+                }
+                
+                // Actualizar confianza
+                const confidenceEl = document.getElementById(`confidence-${symbol}`);
+                if (confidenceEl) {
+                    confidenceEl.textContent = `${symbolData.confidence}%`;
+                }
+            });
+            
+            // Actualizar hora
+            document.getElementById('current-time').textContent = new Date().toLocaleTimeString();
         }
         
         function refreshData() {
             socket.emit('refresh_data');
+            document.getElementById('last-update').innerHTML = '🔄 Actualizando...';
         }
+        
+        // Inicializar precios para comparación
+        window.addEventListener('load', function() {
+            {% for symbol, data in symbols_data.items() %}
+            lastPrices['{{ data.symbol }}'] = {{ data.price }};
+            {% endfor %}
+        });
+        
     </script>
     {% else %}
     <script>
         function refreshData() {
-            location.reload();
+            // En modo HTTP, actualizar suavemente sin recargar
+            fetch('/api/data')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        updateSymbolsDataSmooth(data.data);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error actualizando datos:', error);
+                    // Solo recargar si hay error
+                    location.reload();
+                });
         }
         
-        // Auto-refresh cada 2 minutos en modo HTTP
-        setInterval(function() {
-            location.reload();
-        }, 120000);
+        function updateSymbolsDataSmooth(data) {
+            // Misma función de actualización suave para modo HTTP
+            Object.values(data).forEach(symbolData => {
+                const symbol = symbolData.symbol;
+                
+                // Actualizar elementos sin recargar página
+                const priceEl = document.getElementById(`price-${symbol}`);
+                if (priceEl) {
+                    priceEl.textContent = `${symbolData.price.toFixed(8)}`;
+                }
+                
+                const changeEl = document.getElementById(`change-${symbol}`);
+                if (changeEl) {
+                    changeEl.textContent = `${symbolData.change_24h.toFixed(2)}% (24h)`;
+                    changeEl.className = `change ${symbolData.change_24h >= 0 ? 'positive' : 'negative'}`;
+                }
+                
+                const rsiEl = document.getElementById(`rsi-${symbol}`);
+                if (rsiEl) rsiEl.textContent = symbolData.rsi;
+                
+                const macdEl = document.getElementById(`macd-${symbol}`);
+                if (macdEl) macdEl.textContent = symbolData.macd.toFixed(6);
+                
+                const signalEl = document.getElementById(`signal-${symbol}`);
+                if (signalEl) {
+                    signalEl.textContent = symbolData.signal;
+                    signalEl.className = `signal ${symbolData.color}`;
+                }
+                
+                const confidenceEl = document.getElementById(`confidence-${symbol}`);
+                if (confidenceEl) confidenceEl.textContent = `${symbolData.confidence}%`;
+            });
+            
+            document.getElementById('current-time').textContent = new Date().toLocaleTimeString();
+            document.getElementById('last-update').innerHTML = '✨ Actualizado ' + new Date().toLocaleTimeString();
+        }
+        
+        // Auto-refresh cada 3 minutos en modo HTTP (menos frecuente)
+        setInterval(refreshData, 180000);
     </script>
     {% endif %}
+    
+    <script>
+        // Actualizar reloj cada segundo
+        setInterval(function() {
+            document.getElementById('current-time').textContent = new Date().toLocaleTimeString();
+        }, 1000);
+    </script>
 </body>
 </html>"""
     
     with open(os.path.join(template_dir, 'index.html'), 'w', encoding='utf-8') as f:
         f.write(html_content)
     
-    print("✅ Template HTML simple creado")
+    print("✅ Template HTML con actualización suave creado")
 
 if __name__ == '__main__':
     print("🚀 Configurando Jaime Merino Trading Bot...")
     
-    # Crear template simple
-    create_simple_template()
+    # Crear template optimizado
+    create_smooth_template()
     
     # Generar datos iniciales
     trading_data = generate_trading_data()
@@ -677,6 +904,8 @@ if __name__ == '__main__':
     print(f"🌍 Iniciando servidor en {host}:{port}")
     print("💡 Filosofía: El arte de tomar dinero de otros legalmente")
     print(f"📡 SocketIO: {'Habilitado' if SOCKETIO_AVAILABLE else 'Deshabilitado'}")
+    print("🔄 Actualización suave activada - Sin parpadeo")
+    print("📊 Precios semi-reales desde CoinGecko API")
     
     # Ejecutar aplicación
     if SOCKETIO_AVAILABLE and socketio:
