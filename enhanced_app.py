@@ -15,19 +15,30 @@ from flask import Flask, render_template, jsonify, request
 import sys
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
+# Configuración de servicios con manejo robusto de errores
+BINANCE_SERVICE_AVAILABLE = False
+binance_service = None
+
 try:
-    from services.binance_service import binance_service
-    BINANCE_SERVICE_AVAILABLE = True
-    print("✅ BinanceService importado correctamente")
+    # Importar la clase BinanceService, no la instancia
+    from services.binance_service import BinanceService
+    # Crear instancia con manejo de errores
+    binance_service = BinanceService()
+    
+    # Test de conexión básico
+    if binance_service.test_connection():
+        BINANCE_SERVICE_AVAILABLE = True
+        print("✅ BinanceService importado y conectado correctamente")
+    else:
+        print("⚠️ BinanceService importado pero sin conexión")
+        BINANCE_SERVICE_AVAILABLE = False
+        
 except ImportError as e:
-    BINANCE_SERVICE_AVAILABLE = False
-    binance_service = None
     print(f"⚠️ No se pudo importar BinanceService: {e}")
+except Exception as e:
+    print(f"⚠️ Error inicializando BinanceService: {e}")
 
-# Importar el servicio de Binance refactorizado
-# Inicializar servicio real de Binance
-binance_service = BinanceService()
-
+# Base de precios actualizada (fallback cuando Binance no está disponible)
 BASE_PRICES = {
     'BTCUSDT': 67000,   # Actualizado - precio aproximado actual
     'ETHUSDT': 3200,    # Actualizado - precio aproximado actual
@@ -40,6 +51,7 @@ BASE_PRICES = {
     'LINKUSDT': 15.50,
     'AVAXUSDT': 28.00
 }
+
 # Importar SocketIO con manejo de errores
 try:
     from flask_socketio import SocketIO, emit
@@ -52,6 +64,7 @@ except ImportError:
 print("🚀 Iniciando Jaime Merino Trading Bot")
 print(f"🐍 Python: {sys.version}")
 print(f"📡 SocketIO: {SOCKETIO_AVAILABLE}")
+print(f"🔗 Binance: {BINANCE_SERVICE_AVAILABLE}")
 
 # Configuración de Flask
 app = Flask(__name__)
@@ -72,136 +85,48 @@ last_prices = {}
 # Configuración específica para template merino_dashboard.html
 SYMBOLS = ['BTCUSDT', 'ETHUSDT']  # Simplificado para coincidir con el template
 
-
-def get_real_price_reference() -> Dict[str, float]:
+def _get_binance_api_direct() -> dict:
     """
-    FUNCIÓN PRINCIPAL: Obtiene precios reales de Binance con fallbacks robustos
-    
-    Returns:
-        Diccionario con precios reales {symbol: price}
-    """
-    print(f"🔍 Obteniendo precios reales para {len(SYMBOLS)} símbolos...")
-    
-    # Método 1: BinanceService refactorizado (PREFERIDO)
-    if BINANCE_SERVICE_AVAILABLE and binance_service:
-        binance_prices = _get_binance_service_prices()
-        if binance_prices and len(binance_prices) >= len(SYMBOLS) * 0.8:  # 80% éxito
-            print(f"✅ Precios de BinanceService: {len(binance_prices)}/{len(SYMBOLS)}")
-            return _complete_missing_prices(binance_prices)
-    
-    # Método 2: API directa de Binance (BACKUP)
-    binance_api_prices = _get_binance_api_direct()
-    if binance_api_prices and len(binance_api_prices) >= len(SYMBOLS) * 0.6:  # 60% éxito
-        print(f"✅ Precios de Binance API directa: {len(binance_api_prices)}/{len(SYMBOLS)}")
-        return _complete_missing_prices(binance_api_prices)
-    
-    # Método 3: CoinGecko (BACKUP EXTERNO)
-    coingecko_prices = _get_coingecko_prices()
-    if coingecko_prices and len(coingecko_prices) >= 2:  # Al menos BTC y ETH
-        print(f"⚠️ Usando precios de CoinGecko: {len(coingecko_prices)}/{len(SYMBOLS)}")
-        return _complete_missing_prices(coingecko_prices)
-    
-    # Método 4: Precios base actualizados (ÚLTIMO RECURSO)
-    print("🚨 USANDO PRECIOS BASE - REVISAR CONEXIÓN A INTERNET")
-    return BASE_PRICES
-
-def _get_binance_service_prices() -> Optional[Dict[str, float]]:
-    """
-    Obtiene precios usando el BinanceService refactorizado
+    Método alternativo: API directa de Binance sin autenticación
+    Funciona incluso con restricciones geográficas usando endpoints públicos
     """
     try:
-        # Test de conexión rápido
-        if not binance_service.test_connection():
-            print("❌ BinanceService: conexión fallida")
-            return None
-        
-        # Obtener precios múltiples de manera eficiente
-        prices = binance_service.get_multiple_prices(SYMBOLS)
-        
-        if not prices:
-            print("❌ BinanceService: no se obtuvieron precios")
-            return None
-        
-        # Validar precios obtenidos
-        valid_prices = {}
-        for symbol, price in prices.items():
-            if price and price > 0:
-                # Validación adicional: precio debe estar en rango razonable
-                base_price = BASE_PRICES.get(symbol, 0)
-                if base_price > 0:
-                    # Precio no puede estar más de 50% fuera del rango esperado
-                    price_ratio = price / base_price
-                    if 0.5 <= price_ratio <= 2.0:
-                        valid_prices[symbol] = price
-                    else:
-                        print(f"⚠️ Precio sospechoso para {symbol}: ${price:,.2f} (esperado ~${base_price:,.2f})")
-                else:
-                    valid_prices[symbol] = price
-        
-        failed_symbols = set(SYMBOLS) - set(valid_prices.keys())
-        if failed_symbols:
-            print(f"⚠️ No se obtuvieron precios válidos para: {failed_symbols}")
-        
-        return valid_prices if valid_prices else None
-        
-    except Exception as e:
-        print(f"❌ Error en _get_binance_service_prices: {e}")
-        return None
-
-def _get_binance_api_direct() -> Optional[Dict[str, float]]:
-    """
-    Obtiene precios directamente de la API de Binance sin usar el servicio
-    """
-    try:
-        print("🔄 Intentando API directa de Binance...")
-        
-        # Obtener todos los precios de una vez
+        # Usar endpoint público que suele ser más permisivo
         url = "https://api.binance.com/api/v3/ticker/price"
         
+        # Headers para simular navegador
         headers = {
-            'User-Agent': 'JaimeMerino-TradingBot/1.0',
-            'Accept': 'application/json'
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            'Accept': 'application/json',
         }
         
-        response = requests.get(url, headers=headers, timeout=15)
-        response.raise_for_status()
+        response = requests.get(url, headers=headers, timeout=10)
         
-        all_tickers = response.json()
-        
-        # Filtrar solo los símbolos que necesitamos
-        prices = {}
-        for ticker in all_tickers:
-            symbol = ticker['symbol']
-            if symbol in SYMBOLS:
-                price = float(ticker['price'])
-                if price > 0:
-                    prices[symbol] = price
-        
-        print(f"📈 API directa: {len(prices)}/{len(SYMBOLS)} precios obtenidos")
-        return prices if prices else None
-        
-    except requests.exceptions.Timeout:
-        print("❌ API directa: Timeout")
-        return None
-    except requests.exceptions.ConnectionError:
-        print("❌ API directa: Error de conexión")
-        return None
-    except requests.exceptions.HTTPError as e:
-        print(f"❌ API directa: Error HTTP {e}")
-        return None
+        if response.status_code == 200:
+            data = response.json()
+            prices = {}
+            
+            # Filtrar solo los símbolos que necesitamos
+            for item in data:
+                if item['symbol'] in SYMBOLS:
+                    prices[item['symbol']] = float(item['price'])
+            
+            return prices
+        else:
+            print(f"❌ Error API Binance: {response.status_code}")
+            return {}
+            
     except Exception as e:
-        print(f"❌ Error en API directa: {e}")
-        return None
+        print(f"❌ Error en API directa Binance: {e}")
+        return {}
 
-def _get_coingecko_prices() -> Optional[Dict[str, float]]:
+def _get_coingecko_prices() -> dict:
     """
-    Obtiene precios de CoinGecko como backup externo
+    Método de backup: CoinGecko API (sin restricciones geográficas)
     """
     try:
-        print("🔄 Intentando CoinGecko como backup...")
-        
-        # Mapeo de símbolos de trading a IDs de CoinGecko
-        coingecko_mapping = {
+        # Mapeo de símbolos Binance a IDs de CoinGecko
+        coin_mapping = {
             'BTCUSDT': 'bitcoin',
             'ETHUSDT': 'ethereum',
             'BNBUSDT': 'binancecoin',
@@ -214,319 +139,142 @@ def _get_coingecko_prices() -> Optional[Dict[str, float]]:
             'AVAXUSDT': 'avalanche-2'
         }
         
-        # Obtener solo los IDs que necesitamos y están disponibles
-        needed_ids = []
-        available_symbols = []
-        for symbol in SYMBOLS:
-            if symbol in coingecko_mapping:
-                needed_ids.append(coingecko_mapping[symbol])
-                available_symbols.append(symbol)
+        # Obtener solo los IDs que necesitamos
+        needed_ids = [coin_mapping[symbol] for symbol in SYMBOLS if symbol in coin_mapping]
+        ids_string = ','.join(needed_ids)
         
-        if not needed_ids:
-            print("⚠️ CoinGecko: No hay símbolos mapeados")
-            return None
+        url = f"https://api.coingecko.com/api/v3/simple/price?ids={ids_string}&vs_currencies=usd"
         
-        ids_param = ','.join(needed_ids)
-        url = f'https://api.coingecko.com/api/v3/simple/price?ids={ids_param}&vs_currencies=usd'
+        response = requests.get(url, timeout=15)
         
-        headers = {
-            'User-Agent': 'JaimeMerino-TradingBot/1.0',
-            'Accept': 'application/json'
-        }
-        
-        response = requests.get(url, headers=headers, timeout=15)
-        response.raise_for_status()
-        
-        data = response.json()
-        
-        # Convertir de vuelta a símbolos de trading
-        prices = {}
-        reverse_mapping = {v: k for k, v in coingecko_mapping.items()}
-        
-        for coin_id, price_data in data.items():
-            symbol = reverse_mapping.get(coin_id)
-            if symbol and symbol in SYMBOLS:
-                price = price_data.get('usd')
-                if price and price > 0:
-                    prices[symbol] = price
-        
-        print(f"🦎 CoinGecko: {len(prices)}/{len(available_symbols)} precios obtenidos")
-        return prices if prices else None
-        
+        if response.status_code == 200:
+            data = response.json()
+            prices = {}
+            
+            # Convertir de vuelta a formato Binance
+            for symbol in SYMBOLS:
+                if symbol in coin_mapping:
+                    coin_id = coin_mapping[symbol]
+                    if coin_id in data and 'usd' in data[coin_id]:
+                        prices[symbol] = data[coin_id]['usd']
+            
+            return prices
+        else:
+            print(f"❌ Error CoinGecko: {response.status_code}")
+            return {}
+            
     except Exception as e:
         print(f"❌ Error en CoinGecko: {e}")
-        return None
+        return {}
 
-def _complete_missing_prices(partial_prices: Dict[str, float]) -> Dict[str, float]:
+def _complete_missing_prices(partial_prices: dict) -> dict:
     """
-    Completa precios faltantes con precios base actualizados
-    
-    Args:
-        partial_prices: Diccionario con algunos precios obtenidos
-        
-    Returns:
-        Diccionario completo con todos los símbolos
+    Completa precios faltantes con datos base actualizados
     """
     complete_prices = partial_prices.copy()
     
-    missing_symbols = []
     for symbol in SYMBOLS:
-        if symbol not in complete_prices:
-            complete_prices[symbol] = BASE_PRICES.get(symbol, 1000.0)  # Fallback genérico
-            missing_symbols.append(symbol)
-    
-    if missing_symbols:
-        print(f"⚠️ Usando precios base para: {missing_symbols}")
+        if symbol not in complete_prices or complete_prices[symbol] <= 0:
+            complete_prices[symbol] = BASE_PRICES.get(symbol, 1.0)
+            print(f"🔄 Precio base usado para {symbol}: ${complete_prices[symbol]:,.2f}")
     
     return complete_prices
 
-def validate_prices(prices: Dict[str, float]) -> Dict[str, float]:
+def get_real_price_reference() -> dict:
     """
-    Valida que los precios sean lógicos y no estén fuera de rango
-    
-    Args:
-        prices: Diccionario de precios a validar
-        
-    Returns:
-        Diccionario de precios validados
+    FUNCIÓN PRINCIPAL: Obtiene precios reales con múltiples fallbacks
+    Prioriza métodos que funcionan con restricciones geográficas
     """
-    validated_prices = {}
+    print(f"🔍 Obteniendo precios reales para {len(SYMBOLS)} símbolos...")
     
-    for symbol, price in prices.items():
-        if not price or price <= 0:
-            print(f"❌ Precio inválido para {symbol}: {price}")
-            price = BASE_PRICES.get(symbol, 1000.0)
-        
-        # Validaciones específicas por tipo de activo
-        if symbol == 'BTCUSDT':
-            if price < 20000 or price > 150000:  # Rango razonable para BTC
-                print(f"⚠️ Precio BTC fuera de rango: ${price:,.2f}")
-                price = BASE_PRICES['BTCUSDT']
-        elif symbol == 'ETHUSDT':
-            if price < 1000 or price > 10000:  # Rango razonable para ETH
-                print(f"⚠️ Precio ETH fuera de rango: ${price:,.2f}")
-                price = BASE_PRICES['ETHUSDT']
-        elif 'USDT' in symbol:
-            # Para otros pares USDT, verificar que no sean extremos
-            base_price = BASE_PRICES.get(symbol, 0)
-            if base_price > 0:
-                ratio = price / base_price
-                if ratio < 0.1 or ratio > 10:  # Variación máxima 10x
-                    print(f"⚠️ Precio {symbol} fuera de rango: ${price:,.6f}")
-                    price = base_price
-        
-        validated_prices[symbol] = price
+    # Método 1: BinanceService (solo si está disponible y conectado)
+    if BINANCE_SERVICE_AVAILABLE and binance_service:
+        try:
+            binance_prices = {}
+            for symbol in SYMBOLS:
+                price = binance_service.get_current_price(symbol)
+                if price and price > 0:
+                    binance_prices[symbol] = price
+            
+            if len(binance_prices) >= len(SYMBOLS) * 0.8:  # 80% éxito
+                print(f"✅ Precios de BinanceService: {len(binance_prices)}/{len(SYMBOLS)}")
+                return _complete_missing_prices(binance_prices)
+        except Exception as e:
+            print(f"⚠️ Error en BinanceService: {e}")
     
-    return validated_prices
+    # Método 2: API directa de Binance (BACKUP PRINCIPAL)
+    print("🔄 Intentando API directa de Binance...")
+    binance_api_prices = _get_binance_api_direct()
+    if binance_api_prices and len(binance_api_prices) >= len(SYMBOLS) * 0.6:  # 60% éxito
+        print(f"✅ Precios de Binance API directa: {len(binance_api_prices)}/{len(SYMBOLS)}")
+        return _complete_missing_prices(binance_api_prices)
+    
+    # Método 3: CoinGecko (BACKUP EXTERNO)
+    print("🔄 Intentando CoinGecko...")
+    coingecko_prices = _get_coingecko_prices()
+    if coingecko_prices and len(coingecko_prices) >= 2:  # Al menos BTC y ETH
+        print(f"✅ Usando precios de CoinGecko: {len(coingecko_prices)}/{len(SYMBOLS)}")
+        return _complete_missing_prices(coingecko_prices)
+    
+    # Método 4: Precios base actualizados (ÚLTIMO RECURSO)
+    print("🚨 USANDO PRECIOS BASE - REVISAR CONEXIÓN A INTERNET")
+    return {symbol: BASE_PRICES.get(symbol, 1.0) for symbol in SYMBOLS}
 
-def get_price_statistics(prices: Dict[str, float]) -> Dict[str, any]:
-    """
-    Genera estadísticas de los precios obtenidos
-    
-    Args:
-        prices: Diccionario de precios
-        
-    Returns:
-        Diccionario con estadísticas
-    """
-    stats = {
-        'total_symbols': len(SYMBOLS),
-        'prices_obtained': len(prices),
-        'success_rate': (len(prices) / len(SYMBOLS)) * 100,
-        'timestamp': datetime.now().isoformat(),
-        'price_summary': {}
-    }
-    
-    # Calcular cambios respecto a precios base
-    for symbol in SYMBOLS:
-        current_price = prices.get(symbol, 0)
-        base_price = BASE_PRICES.get(symbol, 0)
-        
-        if current_price > 0 and base_price > 0:
-            change_pct = ((current_price - base_price) / base_price) * 100
-            stats['price_summary'][symbol] = {
-                'current': current_price,
-                'base': base_price,
-                'change_pct': round(change_pct, 2),
-                'status': 'updated' if abs(change_pct) > 1 else 'stable'
-            }
-        else:
-            stats['price_summary'][symbol] = {
-                'current': current_price,
-                'base': base_price,
-                'status': 'error'
-            }
-    
-    return stats
-
-
-def generate_enhanced_analysis(symbol, current_price):
-    """Genera análisis completo para el template merino_dashboard.html"""
-    
-    # Indicadores técnicos simulados
+def generate_enhanced_analysis(symbol: str, price: float) -> dict:
+    """Genera análisis mejorado basado en el precio real"""
+    # Simulación de RSI más realista
     rsi = random.uniform(25, 75)
-    ema_11 = current_price * random.uniform(0.98, 1.02)
-    ema_55 = current_price * random.uniform(0.95, 1.05)
-    adx = random.uniform(20, 60)
-    macd = (current_price - BASE_PRICES[symbol]) * random.uniform(0.001, 0.003)
     
-    # Bollinger Bands
-    bb_upper = current_price * 1.02
-    bb_lower = current_price * 0.98
-    bb_middle = current_price
+    # Simulación de MACD más coherente
+    macd = random.uniform(-0.5, 0.5) * (price * 0.001)
+    signal = macd + random.uniform(-0.1, 0.1) * (price * 0.0005)
     
-    # Lógica de señales según metodología Merino
-    signal_strength = 0
-    signal = "WAIT"
-    
-    # Análisis de tendencia
-    if ema_11 > ema_55:
-        signal_strength += 25
-        trend = "ALCISTA"
+    # Determinación de tendencia basada en indicadores
+    if rsi > 70:
+        trend = "Sobrecomprado"
+        trend_class = "warning"
+    elif rsi < 30:
+        trend = "Sobreventa" 
+        trend_class = "success"
     else:
-        trend = "BAJISTA"
-        signal_strength += 15
+        trend = "Neutral"
+        trend_class = "info"
     
-    # RSI
-    if rsi < 30:
-        signal_strength += 20
-        if trend == "ALCISTA":
-            signal = "LONG"
-    elif rsi > 70:
-        signal_strength += 20
-        if trend == "BAJISTA":
-            signal = "SHORT"
-    
-    # ADX (fuerza de tendencia)
-    if adx > 25:
-        signal_strength += 15
-    
-    # MACD
-    if macd > 0 and signal == "LONG":
-        signal_strength += 20
-    elif macd < 0 and signal == "SHORT":
-        signal_strength += 20
-    
-    # Determinar señal final
-    if signal_strength >= 70:
-        confidence = "HIGH"
-    elif signal_strength >= 50:
-        confidence = "MEDIUM" 
-    else:
-        confidence = "LOW"
-        signal = "WAIT"
-    
-    # Cálculos para futuros (metodología Merino)
-    entry_optimal = current_price
-    if signal == "LONG":
-        entry_range_low = current_price * 0.99
-        entry_range_high = current_price * 1.01
-        target_1 = current_price * 1.02
-        target_2 = current_price * 1.04
-        target_3 = current_price * 1.06
-        stop_loss = current_price * 0.97
-        invalidation = current_price * 0.95
-    elif signal == "SHORT":
-        entry_range_low = current_price * 0.99
-        entry_range_high = current_price * 1.01
-        target_1 = current_price * 0.98
-        target_2 = current_price * 0.96
-        target_3 = current_price * 0.94
-        stop_loss = current_price * 1.03
-        invalidation = current_price * 1.05
-    else:
-        entry_range_low = current_price * 0.995
-        entry_range_high = current_price * 1.005
-        target_1 = current_price * 1.01
-        target_2 = current_price * 1.02
-        target_3 = current_price * 1.03
-        stop_loss = current_price * 0.99
-        invalidation = current_price * 0.97
+    # Simulación de volumen proporcional al precio
+    volume_24h = random.uniform(50000000, 2000000000)
+    if symbol == 'BTCUSDT':
+        volume_24h *= 3  # BTC tiene más volumen
     
     return {
-        'current_price': current_price,
-        'signal': {
-            'signal': signal,
-            'signal_strength': signal_strength,
-            'confluence_score': random.randint(1, 4),
-            'confidence': confidence
-        },
-        'indicators': {
-            'rsi': {
-                'value': round(rsi, 1),
-                'status': 'OVERSOLD' if rsi < 30 else 'OVERBOUGHT' if rsi > 70 else 'NEUTRAL'
-            },
-            'ema': {
-                'ema_11': round(ema_11, 2),
-                'ema_55': round(ema_55, 2),
-                'trend': trend
-            },
-            'adx': {
-                'value': round(adx, 1),
-                'strength': 'STRONG' if adx > 25 else 'WEAK'
-            },
-            'macd': {
-                'value': round(macd, 6),
-                'signal': 'BULLISH' if macd > 0 else 'BEARISH'
-            },
-            'bollinger': {
-                'upper': round(bb_upper, 2),
-                'middle': round(bb_middle, 2),
-                'lower': round(bb_lower, 2)
-            }
-        },
-        'futures_setup': {
-            'entry': {
-                'optimal': round(entry_optimal, 2),
-                'range_low': round(entry_range_low, 2),
-                'range_high': round(entry_range_high, 2)
-            },
-            'targets': {
-                'target_1': round(target_1, 2),
-                'target_2': round(target_2, 2),
-                'target_3': round(target_3, 2)
-            },
-            'risk_management': {
-                'stop_loss': round(stop_loss, 2),
-                'invalidation': round(invalidation, 2),
-                'risk_reward': round(abs(target_1 - entry_optimal) / abs(stop_loss - entry_optimal), 2)
-            }
-        },
-        'last_update': datetime.now().strftime('%H:%M:%S'),
-        'timestamp': int(time.time())
+        'symbol': symbol,
+        'price': round(price, 2),
+        'change_24h': round(random.uniform(-8, 8), 2),
+        'volume_24h': round(volume_24h, 0),
+        'rsi': round(rsi, 1),
+        'macd': round(macd, 4),
+        'signal': round(signal, 4),
+        'trend': trend,
+        'trend_class': trend_class,
+        'support': round(price * 0.95, 2),
+        'resistance': round(price * 1.05, 2),
+        'recommendation': 'HOLD' if 40 <= rsi <= 60 else ('SELL' if rsi > 60 else 'BUY'),
+        'timestamp': datetime.now().isoformat()
     }
 
-def generate_trading_data():
+def generate_trading_data() -> dict:
     """
-    Versión mejorada que usa precios reales validados
-    
-    Returns:
-        Diccionario con datos de trading actualizados
+    Genera datos de trading actualizados con precios reales
     """
-    global last_prices
+    print("📊 Generando análisis con precios reales...")
     
     # Obtener precios reales
-    raw_prices = get_real_price_reference()
+    real_prices = get_real_price_reference()
     
-    # Validar precios
-    validated_prices = validate_prices(raw_prices)
-    
-    # Generar estadísticas (opcional, para debugging)
-    price_stats = get_price_statistics(validated_prices)
-    print(f"📊 Tasa de éxito: {price_stats['success_rate']:.1f}%")
-    
-    # Generar datos de trading
     data = {}
     for symbol in SYMBOLS:
-        current_price = validated_prices.get(symbol, BASE_PRICES.get(symbol, 1000))
+        current_price = real_prices.get(symbol, BASE_PRICES.get(symbol, 1.0))
         
-        # Verificar cambio de precio para logging
-        if symbol in last_prices:
-            price_change = ((current_price - last_prices[symbol]) / last_prices[symbol]) * 100
-            if abs(price_change) > 0.1:  # Solo logear cambios significativos
-                print(f"💹 {symbol}: ${last_prices[symbol]:,.2f} → ${current_price:,.2f} ({price_change:+.2f}%)")
-        
-        # Generar análisis con precio real
+        # Generar análisis completo con precio real
         analysis = generate_enhanced_analysis(symbol, current_price)
         
         # Actualizar cache de precios
@@ -534,6 +282,7 @@ def generate_trading_data():
         data[symbol] = analysis
     
     return data
+
 def background_worker():
     """Hilo de trabajo optimizado"""
     global trading_data, clients_connected
@@ -563,34 +312,6 @@ def background_worker():
             print(f"❌ Error en worker: {e}")
             time.sleep(180)
 
-def get_real_prices():
-    """Obtiene precios reales de Binance"""
-    real_prices = {}
-    
-    for symbol in SYMBOLS:
-        try:
-            # Método 1: Precio directo
-            price = binance_service.get_current_price(symbol)
-            if price:
-                real_prices[symbol] = price
-                continue
-                
-            # Método 2: Market data completo
-            market_data = binance_service.get_market_data(symbol)
-            if market_data:
-                real_prices[symbol] = market_data.close_price
-                continue
-                
-            # Método 3: Solo como último recurso usar fallback
-            real_prices[symbol] = BASE_PRICES.get(symbol, 0)
-            print(f"⚠️ Usando precio fallback para {symbol}")
-            
-        except Exception as e:
-            print(f"❌ Error obteniendo precio real {symbol}: {e}")
-            real_prices[symbol] = BASE_PRICES.get(symbol, 0)
-    
-    return real_prices
-
 def test_all_price_sources():
     """
     Función de prueba completa para verificar todas las fuentes
@@ -605,19 +326,24 @@ def test_all_price_sources():
     print("\n1. 🔹 BinanceService:")
     if BINANCE_SERVICE_AVAILABLE:
         start_time = time.time()
-        binance_prices = _get_binance_service_prices()
-        elapsed = time.time() - start_time
-        
-        if binance_prices:
-            print(f"   ✅ Éxito en {elapsed:.2f}s:")
+        try:
+            binance_prices = {}
             for symbol in test_symbols:
-                price = binance_prices.get(symbol)
+                price = binance_service.get_current_price(symbol)
                 if price:
+                    binance_prices[symbol] = price
+            elapsed = time.time() - start_time
+            
+            if binance_prices:
+                print(f"   ✅ Éxito en {elapsed:.2f}s:")
+                for symbol, price in binance_prices.items():
                     print(f"      {symbol}: ${price:,.2f}")
-        else:
-            print("   ❌ No disponible")
+            else:
+                print("   ❌ No se obtuvieron precios")
+        except Exception as e:
+            print(f"   ❌ Error: {e}")
     else:
-        print("   ❌ Servicio no importado")
+        print("   ❌ Servicio no disponible")
     
     # Test 2: API directa
     print("\n2. 🔹 Binance API Directa:")
@@ -655,85 +381,26 @@ def test_all_price_sources():
     final_prices = get_real_price_reference()
     elapsed = time.time() - start_time
     
-    print(f"   ✅ Completado en {elapsed:.2f}s:")
+    print(f"   ✅ Resultado final en {elapsed:.2f}s:")
     for symbol in test_symbols:
-        price = final_prices.get(symbol, 0)
-        print(f"      {symbol}: ${price:,.2f}")
+        price = final_prices.get(symbol)
+        if price:
+            print(f"      {symbol}: ${price:,.2f}")
     
-    # Estadísticas finales
-    stats = get_price_statistics(final_prices)
-    print(f"\n📈 Estadísticas:")
-    print(f"   • Tasa de éxito: {stats['success_rate']:.1f}%")
-    print(f"   • Símbolos: {stats['prices_obtained']}/{stats['total_symbols']}")
-    
-    print("\n✅ Prueba completada")
-    print("="*60)
+    print("\n" + "="*60)
 
+# ==============================================================================
+# RUTAS FLASK
+# ==============================================================================
 
 @app.route('/')
-def home():
-    """Página principal usando merino_dashboard.html"""
-    global trading_data
-    
-    try:
-        # Generar datos iniciales si no existen
-        if not trading_data:
-            trading_data = generate_trading_data()
-        
-        # Preparar datos para el template
-        template_data = {
-            'symbols_data': trading_data,
-            'server_time': datetime.now().strftime('%H:%M:%S'),
-            'socketio_enabled': SOCKETIO_AVAILABLE,
-            'philosophy': {
-                'main_principle': "El arte de tomar dinero de otros legalmente",
-                'risk_principle': "Es mejor perder una oportunidad que perder dinero",
-                'probability_principle': "Solo operamos con alta probabilidad de éxito",
-                'market_principle': "Operamos contra el 90% que pierde dinero"
-            },
-            'stats': {
-                'active_signals': len([s for s in trading_data.values() if s['signal']['signal'] != 'WAIT']),
-                'high_prob_signals': len([s for s in trading_data.values() if s['signal']['signal_strength'] >= 70]),
-                'symbols_analyzed': f"{len(trading_data)}/{len(SYMBOLS)}"
-            }
-        }
-        
-        return render_template('merino_dashboard.html', **template_data)
-        
-    except Exception as e:
-        print(f"❌ Error cargando template merino_dashboard.html: {e}")
-        # Fallback a template simple
-        return f"""
-        <h1>🚀 Jaime Merino Trading Bot</h1>
-        <p>Error cargando dashboard: {str(e)}</p>
-        <p>📊 <a href="/api/data">Ver datos JSON</a></p>
-        <p>💡 <a href="/health">Health Check</a></p>
-        <p><strong>Template esperado:</strong> templates/merino_dashboard.html</p>
-        """
+def dashboard():
+    """Página principal del dashboard"""
+    return render_template('merino_dashboard.html')
 
-@app.route('/health')
-def health():
-    """Health check mejorado"""
-    uptime = datetime.now() - server_start_time
-    
-    return jsonify({
-        'status': 'healthy',
-        'app': 'Jaime Merino Trading Bot',
-        'version': '2.2.0',
-        'template': 'merino_dashboard.html',
-        'uptime_seconds': int(uptime.total_seconds()),
-        'socketio_enabled': SOCKETIO_AVAILABLE,
-        'clients_connected': clients_connected,
-        'symbols_tracked': len(SYMBOLS),
-        'last_data_update': trading_data.get('BTCUSDT', {}).get('last_update', 'never'),
-        'real_prices_enabled': True,
-        'timestamp': datetime.now().isoformat(),
-        'philosophy': "Es mejor perder una oportunidad que perder dinero"
-    })
-
-@app.route('/api/data')
-def api_data():
-    """API de datos compatible con dashboard"""
+@app.route('/api/trading-data')
+def api_trading_data():
+    """API endpoint para datos de trading"""
     global trading_data
     
     if not trading_data:
@@ -743,171 +410,114 @@ def api_data():
         'success': True,
         'data': trading_data,
         'timestamp': datetime.now().isoformat(),
-        'template': 'merino_dashboard.html',
-        'data_source': 'enhanced_analysis_service',
-        'philosophy': "Solo operamos con alta probabilidad de éxito"
+        'server_time': (datetime.now() - server_start_time).total_seconds(),
+        'connected_clients': clients_connected,
+        'binance_available': BINANCE_SERVICE_AVAILABLE
     })
 
-@app.route('/api/analysis/<symbol>')
-def api_analysis(symbol):
-    """API para análisis específico de símbolo"""
-    symbol = symbol.upper()
-    if symbol in trading_data:
+@app.route('/api/test-sources')
+def api_test_sources():
+    """Endpoint para probar todas las fuentes de precios"""
+    try:
+        test_all_price_sources()
         return jsonify({
             'success': True,
-            'symbol': symbol,
-            'analysis': trading_data[symbol],
-            'timestamp': datetime.now().isoformat()
+            'message': 'Test completado - revisa la consola para detalles'
         })
-    else:
+    except Exception as e:
         return jsonify({
             'success': False,
-            'error': f'Símbolo {symbol} no encontrado',
-            'available_symbols': list(trading_data.keys())
-        }), 404
+            'error': str(e)
+        })
 
-# Rutas adicionales para compatibilidad con el dashboard
-
-@app.route('/api/symbols')
-def api_symbols():
-    """Lista de símbolos soportados"""
+@app.route('/health')
+def health_check():
+    """Health check endpoint"""
     return jsonify({
-        'success': True,
-        'symbols': SYMBOLS,
-        'count': len(SYMBOLS),
-        'timestamp': datetime.now().isoformat()
+        'status': 'healthy',
+        'timestamp': datetime.now().isoformat(),
+        'binance_service': BINANCE_SERVICE_AVAILABLE,
+        'socketio': SOCKETIO_AVAILABLE,
+        'uptime_seconds': (datetime.now() - server_start_time).total_seconds()
     })
 
-@app.route('/api/philosophy')
-def api_philosophy():
-    """Filosofía Merino para el dashboard"""
-    return jsonify({
-        'success': True,
-        'philosophy': {
-            'main_principle': "El arte de tomar dinero de otros legalmente",
-            'risk_principle': "Es mejor perder una oportunidad que perder dinero",
-            'probability_principle': "Solo operamos con alta probabilidad de éxito",
-            'market_principle': "Operamos contra el 90% que pierde dinero",
-            'discipline': "Disciplina > Análisis técnico perfecto"
-        },
-        'methodology': {
-            'timeframes': ['4H', '1H', '1D'],
-            'key_indicators': ['EMA11/55', 'RSI', 'ADX', 'MACD', 'Bollinger Bands'],
-            'risk_management': 'Metodología 40-30-20-10'
-        },
-        'timestamp': datetime.now().isoformat()
-    })
+# ==============================================================================
+# WEBSOCKET EVENTS (SI SOCKETIO ESTÁ DISPONIBLE)
+# ==============================================================================
 
-# Eventos SocketIO compatibles con el dashboard
-if SOCKETIO_AVAILABLE:
+if SOCKETIO_AVAILABLE and socketio:
     @socketio.on('connect')
-    def on_connect():
+    def handle_connect():
         global clients_connected
         clients_connected += 1
-        print(f"🔗 Cliente conectado al dashboard Merino. Total: {clients_connected}")
+        print(f"👤 Cliente conectado. Total: {clients_connected}")
         
-        # Enviar datos iniciales compatibles con el dashboard
+        # Enviar datos iniciales
         emit('analysis_update', {
-            'data': trading_data,
+            'data': trading_data or generate_trading_data(),
             'timestamp': datetime.now().isoformat(),
-            'message': 'Conectado al Dashboard Jaime Merino',
-            'philosophy': "Operamos contra el 90% que pierde dinero",
+            'clients': clients_connected,
+            'philosophy': "El arte de tomar dinero de otros legalmente",
             'update_type': 'initial'
         })
-    
+
     @socketio.on('disconnect')
-    def on_disconnect():
+    def handle_disconnect():
         global clients_connected
         clients_connected = max(0, clients_connected - 1)
-        print(f"❌ Cliente desconectado del dashboard. Total: {clients_connected}")
-    
-    @socketio.on('request_analysis')
-    def on_request_analysis(data):
-        """Evento específico del dashboard para solicitar análisis"""
-        symbol = data.get('symbol', '').upper()
-        print(f"📊 Análisis solicitado para {symbol}")
-        
-        if symbol in SYMBOLS:
-            global trading_data
-            trading_data = generate_trading_data()
-            
-            emit('analysis_update', {
-                'data': trading_data,
-                'timestamp': datetime.now().isoformat(),
-                'message': f'Análisis actualizado para {symbol}',
-                'update_type': 'manual'
-            })
-        else:
-            emit('analysis_error', {
-                'error': f'Símbolo {symbol} no soportado',
-                'available_symbols': SYMBOLS
-            })
-    
-    @socketio.on('request_all_symbols')
-    def on_request_all_symbols():
-        """Evento para solicitar análisis de todos los símbolos"""
-        print("📊 Análisis completo solicitado")
-        
+        print(f"👋 Cliente desconectado. Total: {clients_connected}")
+
+    @socketio.on('request_update')
+    def handle_request_update():
+        """Maneja solicitudes manuales de actualización"""
         global trading_data
         trading_data = generate_trading_data()
         
         emit('analysis_update', {
             'data': trading_data,
             'timestamp': datetime.now().isoformat(),
-            'message': 'Análisis completo actualizado',
-            'update_type': 'complete'
+            'clients': clients_connected,
+            'philosophy': "El arte de tomar dinero de otros legalmente",
+            'update_type': 'manual'
         })
 
-def check_template_exists():
-    """Verificar que el template merino_dashboard.html existe"""
-    template_path = 'templates/merino_dashboard.html'
-    if os.path.exists(template_path):
-        print("✅ Template merino_dashboard.html encontrado")
-        return True
-    else:
-        print("⚠️ Template merino_dashboard.html NO encontrado")
-        print(f"   Esperado en: {os.path.abspath(template_path)}")
-        return False
+# ==============================================================================
+# INICIALIZACIÓN Y EJECUCIÓN
+# ==============================================================================
 
 if __name__ == '__main__':
-    print("🚀 Configurando Jaime Merino Trading Bot...")
-    print("📋 Usando template: merino_dashboard.html")
-    SYMBOLS = ['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'ADAUSDT']
+    print("\n🔧 Verificando configuración inicial...")
     
-    # Ejecutar pruebas
+    # Test rápido de fuentes de precios
+    print("🧪 Probando fuentes de precios...")
     test_all_price_sources()
-    # Verificar template
-    template_exists = check_template_exists()
     
     # Generar datos iniciales
+    print("📊 Generando datos iniciales...")
     trading_data = generate_trading_data()
     
     # Iniciar worker en segundo plano
-    worker = threading.Thread(target=background_worker, daemon=True)
-    worker.start()
+    worker_thread = threading.Thread(target=background_worker, daemon=True)
+    worker_thread.start()
+    print("✅ Worker de análisis iniciado")
     
-    # Configuración para Render
+    # Configuración del servidor
     port = int(os.environ.get('PORT', 5000))
     host = '0.0.0.0'
     
-    print(f"🌍 Iniciando servidor en {host}:{port}")
-    print("💡 Filosofía: El arte de tomar dinero de otros legalmente")
-    print(f"📡 SocketIO: {'Habilitado' if SOCKETIO_AVAILABLE else 'Deshabilitado'}")
-    print(f"📋 Template: {'✅ Encontrado' if template_exists else '❌ Faltante'}")
-    print(f"📊 Símbolos: {', '.join(SYMBOLS)}")
+    print(f"\n🚀 Iniciando servidor Jaime Merino Trading Bot")
+    print(f"🌐 URL: http://localhost:{port}")
+    print(f"📈 Dashboard: Metodología Trading Latino Avanzada")
+    print(f"💡 Filosofía: 'El arte de tomar dinero de otros legalmente'")
+    print(f"🎯 Disciplina: 'Es mejor perder una oportunidad que perder dinero'")
     
-    # Ejecutar aplicación
-    if SOCKETIO_AVAILABLE and socketio:
-        socketio.run(
-            app,
-            host=host,
-            port=port,
-            debug=False,
-            allow_unsafe_werkzeug=True
-        )
-    else:
-        app.run(
-            host=host,
-            port=port,
-            debug=False
-        )
+    try:
+        if SOCKETIO_AVAILABLE and socketio:
+            print("🔌 Modo: WebSocket + Flask")
+            socketio.run(app, host=host, port=port, debug=False)
+        else:
+            print("🔌 Modo: Solo Flask (sin WebSocket)")
+            app.run(host=host, port=port, debug=False)
+    except Exception as e:
+        print(f"❌ Error iniciando servidor: {e}")
+        print("💡 Verifica que el puerto no esté ocupado")
