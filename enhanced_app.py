@@ -14,11 +14,32 @@ from datetime import datetime
 from flask import Flask, render_template, jsonify, request
 import sys
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-from services.binance_service import BinanceService
 
+try:
+    from services.binance_service import binance_service
+    BINANCE_SERVICE_AVAILABLE = True
+    print("✅ BinanceService importado correctamente")
+except ImportError as e:
+    BINANCE_SERVICE_AVAILABLE = False
+    binance_service = None
+    print(f"⚠️ No se pudo importar BinanceService: {e}")
+
+# Importar el servicio de Binance refactorizado
 # Inicializar servicio real de Binance
 binance_service = BinanceService()
 
+BASE_PRICES = {
+    'BTCUSDT': 67000,   # Actualizado - precio aproximado actual
+    'ETHUSDT': 3200,    # Actualizado - precio aproximado actual
+    'BNBUSDT': 580,
+    'ADAUSDT': 0.45,
+    'SOLUSDT': 185,
+    'XRPUSDT': 0.62,
+    'DOGEUSDT': 0.12,
+    'MATICUSDT': 0.55,
+    'LINKUSDT': 15.50,
+    'AVAXUSDT': 28.00
+}
 # Importar SocketIO con manejo de errores
 try:
     from flask_socketio import SocketIO, emit
@@ -50,56 +71,294 @@ last_prices = {}
 
 # Configuración específica para template merino_dashboard.html
 SYMBOLS = ['BTCUSDT', 'ETHUSDT']  # Simplificado para coincidir con el template
-BASE_PRICES = {
-    'BTCUSDT': 43500,
-    'ETHUSDT': 2920
-}
 
-def get_real_price_reference():
-    """Obtiene precios de múltiples fuentes"""
+
+def get_real_price_reference() -> Dict[str, float]:
+    """
+    FUNCIÓN PRINCIPAL: Obtiene precios reales de Binance con fallbacks robustos
     
-    # Método 1: Binance directo (preferido)
-    try:
-        binance_prices = {}
-        for symbol in SYMBOLS:
-            price = binance_service.get_current_price(symbol)
-            if price:
-                binance_prices[symbol] = price
-        
-        if binance_prices:
-            print(f"✅ Precios de Binance obtenidos: {len(binance_prices)} símbolos")
-            return binance_prices
-    except Exception as e:
-        print(f"⚠️ Error Binance: {e}")
+    Returns:
+        Diccionario con precios reales {symbol: price}
+    """
+    print(f"🔍 Obteniendo precios reales para {len(SYMBOLS)} símbolos...")
     
-    # Método 2: CoinGecko (backup)
-    try:
-        response = requests.get(
-            'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,binancecoin&vs_currencies=usd',
-            timeout=10
-        )
-        
-        if response.status_code == 200:
-            data = response.json()
-            gecko_prices = {
-                'BTCUSDT': data.get('bitcoin', {}).get('usd'),
-                'ETHUSDT': data.get('ethereum', {}).get('usd'),
-                'BNBUSDT': data.get('binancecoin', {}).get('usd')
-            }
-            
-            # Filtrar None values
-            gecko_prices = {k: v for k, v in gecko_prices.items() if v is not None}
-            
-            if gecko_prices:
-                print(f"✅ Precios de CoinGecko: {len(gecko_prices)} símbolos")
-                return gecko_prices
-                
-    except Exception as e:
-        print(f"⚠️ Error CoinGecko: {e}")
+    # Método 1: BinanceService refactorizado (PREFERIDO)
+    if BINANCE_SERVICE_AVAILABLE and binance_service:
+        binance_prices = _get_binance_service_prices()
+        if binance_prices and len(binance_prices) >= len(SYMBOLS) * 0.8:  # 80% éxito
+            print(f"✅ Precios de BinanceService: {len(binance_prices)}/{len(SYMBOLS)}")
+            return _complete_missing_prices(binance_prices)
     
-    # Método 3: Precios base actualizados (último recurso)
-    print("⚠️ Usando precios base actualizados")
+    # Método 2: API directa de Binance (BACKUP)
+    binance_api_prices = _get_binance_api_direct()
+    if binance_api_prices and len(binance_api_prices) >= len(SYMBOLS) * 0.6:  # 60% éxito
+        print(f"✅ Precios de Binance API directa: {len(binance_api_prices)}/{len(SYMBOLS)}")
+        return _complete_missing_prices(binance_api_prices)
+    
+    # Método 3: CoinGecko (BACKUP EXTERNO)
+    coingecko_prices = _get_coingecko_prices()
+    if coingecko_prices and len(coingecko_prices) >= 2:  # Al menos BTC y ETH
+        print(f"⚠️ Usando precios de CoinGecko: {len(coingecko_prices)}/{len(SYMBOLS)}")
+        return _complete_missing_prices(coingecko_prices)
+    
+    # Método 4: Precios base actualizados (ÚLTIMO RECURSO)
+    print("🚨 USANDO PRECIOS BASE - REVISAR CONEXIÓN A INTERNET")
     return BASE_PRICES
+
+def _get_binance_service_prices() -> Optional[Dict[str, float]]:
+    """
+    Obtiene precios usando el BinanceService refactorizado
+    """
+    try:
+        # Test de conexión rápido
+        if not binance_service.test_connection():
+            print("❌ BinanceService: conexión fallida")
+            return None
+        
+        # Obtener precios múltiples de manera eficiente
+        prices = binance_service.get_multiple_prices(SYMBOLS)
+        
+        if not prices:
+            print("❌ BinanceService: no se obtuvieron precios")
+            return None
+        
+        # Validar precios obtenidos
+        valid_prices = {}
+        for symbol, price in prices.items():
+            if price and price > 0:
+                # Validación adicional: precio debe estar en rango razonable
+                base_price = BASE_PRICES.get(symbol, 0)
+                if base_price > 0:
+                    # Precio no puede estar más de 50% fuera del rango esperado
+                    price_ratio = price / base_price
+                    if 0.5 <= price_ratio <= 2.0:
+                        valid_prices[symbol] = price
+                    else:
+                        print(f"⚠️ Precio sospechoso para {symbol}: ${price:,.2f} (esperado ~${base_price:,.2f})")
+                else:
+                    valid_prices[symbol] = price
+        
+        failed_symbols = set(SYMBOLS) - set(valid_prices.keys())
+        if failed_symbols:
+            print(f"⚠️ No se obtuvieron precios válidos para: {failed_symbols}")
+        
+        return valid_prices if valid_prices else None
+        
+    except Exception as e:
+        print(f"❌ Error en _get_binance_service_prices: {e}")
+        return None
+
+def _get_binance_api_direct() -> Optional[Dict[str, float]]:
+    """
+    Obtiene precios directamente de la API de Binance sin usar el servicio
+    """
+    try:
+        print("🔄 Intentando API directa de Binance...")
+        
+        # Obtener todos los precios de una vez
+        url = "https://api.binance.com/api/v3/ticker/price"
+        
+        headers = {
+            'User-Agent': 'JaimeMerino-TradingBot/1.0',
+            'Accept': 'application/json'
+        }
+        
+        response = requests.get(url, headers=headers, timeout=15)
+        response.raise_for_status()
+        
+        all_tickers = response.json()
+        
+        # Filtrar solo los símbolos que necesitamos
+        prices = {}
+        for ticker in all_tickers:
+            symbol = ticker['symbol']
+            if symbol in SYMBOLS:
+                price = float(ticker['price'])
+                if price > 0:
+                    prices[symbol] = price
+        
+        print(f"📈 API directa: {len(prices)}/{len(SYMBOLS)} precios obtenidos")
+        return prices if prices else None
+        
+    except requests.exceptions.Timeout:
+        print("❌ API directa: Timeout")
+        return None
+    except requests.exceptions.ConnectionError:
+        print("❌ API directa: Error de conexión")
+        return None
+    except requests.exceptions.HTTPError as e:
+        print(f"❌ API directa: Error HTTP {e}")
+        return None
+    except Exception as e:
+        print(f"❌ Error en API directa: {e}")
+        return None
+
+def _get_coingecko_prices() -> Optional[Dict[str, float]]:
+    """
+    Obtiene precios de CoinGecko como backup externo
+    """
+    try:
+        print("🔄 Intentando CoinGecko como backup...")
+        
+        # Mapeo de símbolos de trading a IDs de CoinGecko
+        coingecko_mapping = {
+            'BTCUSDT': 'bitcoin',
+            'ETHUSDT': 'ethereum',
+            'BNBUSDT': 'binancecoin',
+            'ADAUSDT': 'cardano',
+            'SOLUSDT': 'solana',
+            'XRPUSDT': 'ripple',
+            'DOGEUSDT': 'dogecoin',
+            'MATICUSDT': 'matic-network',
+            'LINKUSDT': 'chainlink',
+            'AVAXUSDT': 'avalanche-2'
+        }
+        
+        # Obtener solo los IDs que necesitamos y están disponibles
+        needed_ids = []
+        available_symbols = []
+        for symbol in SYMBOLS:
+            if symbol in coingecko_mapping:
+                needed_ids.append(coingecko_mapping[symbol])
+                available_symbols.append(symbol)
+        
+        if not needed_ids:
+            print("⚠️ CoinGecko: No hay símbolos mapeados")
+            return None
+        
+        ids_param = ','.join(needed_ids)
+        url = f'https://api.coingecko.com/api/v3/simple/price?ids={ids_param}&vs_currencies=usd'
+        
+        headers = {
+            'User-Agent': 'JaimeMerino-TradingBot/1.0',
+            'Accept': 'application/json'
+        }
+        
+        response = requests.get(url, headers=headers, timeout=15)
+        response.raise_for_status()
+        
+        data = response.json()
+        
+        # Convertir de vuelta a símbolos de trading
+        prices = {}
+        reverse_mapping = {v: k for k, v in coingecko_mapping.items()}
+        
+        for coin_id, price_data in data.items():
+            symbol = reverse_mapping.get(coin_id)
+            if symbol and symbol in SYMBOLS:
+                price = price_data.get('usd')
+                if price and price > 0:
+                    prices[symbol] = price
+        
+        print(f"🦎 CoinGecko: {len(prices)}/{len(available_symbols)} precios obtenidos")
+        return prices if prices else None
+        
+    except Exception as e:
+        print(f"❌ Error en CoinGecko: {e}")
+        return None
+
+def _complete_missing_prices(partial_prices: Dict[str, float]) -> Dict[str, float]:
+    """
+    Completa precios faltantes con precios base actualizados
+    
+    Args:
+        partial_prices: Diccionario con algunos precios obtenidos
+        
+    Returns:
+        Diccionario completo con todos los símbolos
+    """
+    complete_prices = partial_prices.copy()
+    
+    missing_symbols = []
+    for symbol in SYMBOLS:
+        if symbol not in complete_prices:
+            complete_prices[symbol] = BASE_PRICES.get(symbol, 1000.0)  # Fallback genérico
+            missing_symbols.append(symbol)
+    
+    if missing_symbols:
+        print(f"⚠️ Usando precios base para: {missing_symbols}")
+    
+    return complete_prices
+
+def validate_prices(prices: Dict[str, float]) -> Dict[str, float]:
+    """
+    Valida que los precios sean lógicos y no estén fuera de rango
+    
+    Args:
+        prices: Diccionario de precios a validar
+        
+    Returns:
+        Diccionario de precios validados
+    """
+    validated_prices = {}
+    
+    for symbol, price in prices.items():
+        if not price or price <= 0:
+            print(f"❌ Precio inválido para {symbol}: {price}")
+            price = BASE_PRICES.get(symbol, 1000.0)
+        
+        # Validaciones específicas por tipo de activo
+        if symbol == 'BTCUSDT':
+            if price < 20000 or price > 150000:  # Rango razonable para BTC
+                print(f"⚠️ Precio BTC fuera de rango: ${price:,.2f}")
+                price = BASE_PRICES['BTCUSDT']
+        elif symbol == 'ETHUSDT':
+            if price < 1000 or price > 10000:  # Rango razonable para ETH
+                print(f"⚠️ Precio ETH fuera de rango: ${price:,.2f}")
+                price = BASE_PRICES['ETHUSDT']
+        elif 'USDT' in symbol:
+            # Para otros pares USDT, verificar que no sean extremos
+            base_price = BASE_PRICES.get(symbol, 0)
+            if base_price > 0:
+                ratio = price / base_price
+                if ratio < 0.1 or ratio > 10:  # Variación máxima 10x
+                    print(f"⚠️ Precio {symbol} fuera de rango: ${price:,.6f}")
+                    price = base_price
+        
+        validated_prices[symbol] = price
+    
+    return validated_prices
+
+def get_price_statistics(prices: Dict[str, float]) -> Dict[str, any]:
+    """
+    Genera estadísticas de los precios obtenidos
+    
+    Args:
+        prices: Diccionario de precios
+        
+    Returns:
+        Diccionario con estadísticas
+    """
+    stats = {
+        'total_symbols': len(SYMBOLS),
+        'prices_obtained': len(prices),
+        'success_rate': (len(prices) / len(SYMBOLS)) * 100,
+        'timestamp': datetime.now().isoformat(),
+        'price_summary': {}
+    }
+    
+    # Calcular cambios respecto a precios base
+    for symbol in SYMBOLS:
+        current_price = prices.get(symbol, 0)
+        base_price = BASE_PRICES.get(symbol, 0)
+        
+        if current_price > 0 and base_price > 0:
+            change_pct = ((current_price - base_price) / base_price) * 100
+            stats['price_summary'][symbol] = {
+                'current': current_price,
+                'base': base_price,
+                'change_pct': round(change_pct, 2),
+                'status': 'updated' if abs(change_pct) > 1 else 'stable'
+            }
+        else:
+            stats['price_summary'][symbol] = {
+                'current': current_price,
+                'base': base_price,
+                'status': 'error'
+            }
+    
+    return stats
+
 
 def generate_enhanced_analysis(symbol, current_price):
     """Genera análisis completo para el template merino_dashboard.html"""
@@ -238,23 +497,43 @@ def generate_enhanced_analysis(symbol, current_price):
     }
 
 def generate_trading_data():
-    """Genera datos compatibles con merino_dashboard.html"""
+    """
+    Versión mejorada que usa precios reales validados
+    
+    Returns:
+        Diccionario con datos de trading actualizados
+    """
     global last_prices
     
-    # Obtener precios reales como referencia
-    real_prices = get_real_prices()
+    # Obtener precios reales
+    raw_prices = get_real_price_reference()
     
+    # Validar precios
+    validated_prices = validate_prices(raw_prices)
+    
+    # Generar estadísticas (opcional, para debugging)
+    price_stats = get_price_statistics(validated_prices)
+    print(f"📊 Tasa de éxito: {price_stats['success_rate']:.1f}%")
+    
+    # Generar datos de trading
     data = {}
     for symbol in SYMBOLS:
-        current_price = real_prices[symbol]
+        current_price = validated_prices.get(symbol, BASE_PRICES.get(symbol, 1000))
         
-        # ✅ Usar precio real, no simulado
+        # Verificar cambio de precio para logging
+        if symbol in last_prices:
+            price_change = ((current_price - last_prices[symbol]) / last_prices[symbol]) * 100
+            if abs(price_change) > 0.1:  # Solo logear cambios significativos
+                print(f"💹 {symbol}: ${last_prices[symbol]:,.2f} → ${current_price:,.2f} ({price_change:+.2f}%)")
+        
+        # Generar análisis con precio real
         analysis = generate_enhanced_analysis(symbol, current_price)
+        
+        # Actualizar cache de precios
         last_prices[symbol] = current_price
         data[symbol] = analysis
     
     return data
-
 def background_worker():
     """Hilo de trabajo optimizado"""
     global trading_data, clients_connected
@@ -312,24 +591,84 @@ def get_real_prices():
     
     return real_prices
 
-def generate_trading_data():
-    """Genera datos usando precios REALES"""
-    global last_prices
+def test_all_price_sources():
+    """
+    Función de prueba completa para verificar todas las fuentes
+    """
+    print("\n" + "="*60)
+    print("🧪 PROBANDO TODAS LAS FUENTES DE PRECIOS")
+    print("="*60)
     
-    # ✅ Obtener precios reales
-    real_prices = get_real_prices()
+    test_symbols = ['BTCUSDT', 'ETHUSDT']
     
-    data = {}
-    for symbol in SYMBOLS:
-        current_price = real_prices[symbol]
+    # Test 1: BinanceService
+    print("\n1. 🔹 BinanceService:")
+    if BINANCE_SERVICE_AVAILABLE:
+        start_time = time.time()
+        binance_prices = _get_binance_service_prices()
+        elapsed = time.time() - start_time
         
-        # ✅ Usar precio real, no simulado
-        analysis = generate_enhanced_analysis(symbol, current_price)
-        last_prices[symbol] = current_price
-        data[symbol] = analysis
+        if binance_prices:
+            print(f"   ✅ Éxito en {elapsed:.2f}s:")
+            for symbol in test_symbols:
+                price = binance_prices.get(symbol)
+                if price:
+                    print(f"      {symbol}: ${price:,.2f}")
+        else:
+            print("   ❌ No disponible")
+    else:
+        print("   ❌ Servicio no importado")
     
-    return data
-# Rutas principales
+    # Test 2: API directa
+    print("\n2. 🔹 Binance API Directa:")
+    start_time = time.time()
+    api_prices = _get_binance_api_direct()
+    elapsed = time.time() - start_time
+    
+    if api_prices:
+        print(f"   ✅ Éxito en {elapsed:.2f}s:")
+        for symbol in test_symbols:
+            price = api_prices.get(symbol)
+            if price:
+                print(f"      {symbol}: ${price:,.2f}")
+    else:
+        print("   ❌ No disponible")
+    
+    # Test 3: CoinGecko
+    print("\n3. 🔹 CoinGecko:")
+    start_time = time.time()
+    gecko_prices = _get_coingecko_prices()
+    elapsed = time.time() - start_time
+    
+    if gecko_prices:
+        print(f"   ✅ Éxito en {elapsed:.2f}s:")
+        for symbol in test_symbols:
+            price = gecko_prices.get(symbol)
+            if price:
+                print(f"      {symbol}: ${price:,.2f}")
+    else:
+        print("   ❌ No disponible")
+    
+    # Test 4: Función principal
+    print("\n4. 🔹 Función Principal:")
+    start_time = time.time()
+    final_prices = get_real_price_reference()
+    elapsed = time.time() - start_time
+    
+    print(f"   ✅ Completado en {elapsed:.2f}s:")
+    for symbol in test_symbols:
+        price = final_prices.get(symbol, 0)
+        print(f"      {symbol}: ${price:,.2f}")
+    
+    # Estadísticas finales
+    stats = get_price_statistics(final_prices)
+    print(f"\n📈 Estadísticas:")
+    print(f"   • Tasa de éxito: {stats['success_rate']:.1f}%")
+    print(f"   • Símbolos: {stats['prices_obtained']}/{stats['total_symbols']}")
+    
+    print("\n✅ Prueba completada")
+    print("="*60)
+
 
 @app.route('/')
 def home():
@@ -533,7 +872,10 @@ def check_template_exists():
 if __name__ == '__main__':
     print("🚀 Configurando Jaime Merino Trading Bot...")
     print("📋 Usando template: merino_dashboard.html")
+    SYMBOLS = ['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'ADAUSDT']
     
+    # Ejecutar pruebas
+    test_all_price_sources()
     # Verificar template
     template_exists = check_template_exists()
     
