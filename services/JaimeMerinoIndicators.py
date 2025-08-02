@@ -421,6 +421,120 @@ class JaimeMerinoSignalGenerator:
             'confluence_score': 0
         }
 
+    def generate_trading_data() -> dict:
+        """
+        Genera datos de trading con niveles calculados correctamente
+        ACTUALIZAR esta función para incluir trading_levels
+        """
+        try:
+            # Obtener precios reales
+            real_prices = get_real_price_reference()
+            binance_prices = get_binance_service_prices()
+            
+            # Usar precios reales si están disponibles
+            current_prices = binance_prices if binance_prices else real_prices
+            
+            trading_data = {}
+            
+            for symbol in SYMBOLS:
+                try:
+                    current_price = current_prices.get(symbol, 50000.0)  # Precio por defecto
+                    
+                    # Generar análisis de señal (tu lógica existente o simulada)
+                    signal_data = generate_enhanced_signal_analysis(symbol, current_price)
+                    
+                    # ¡IMPORTANTE! Calcular niveles de trading
+                    trading_levels = calculate_trading_levels(symbol, current_price, signal_data)
+                    
+                    trading_data[symbol] = {
+                        'symbol': symbol,
+                        'current_price': current_price,
+                        'signal': signal_data,
+                        'trading_levels': trading_levels,  # ¡Esto es lo que falta!
+                        'last_update': datetime.now().isoformat(),
+                        'data_source': 'enhanced_analysis_service'
+                    }
+                    
+                    print(f"✅ {symbol}: ${current_price:.2f} - {signal_data['signal']} ({signal_data['signal_strength']}%) - Entrada: ${trading_levels['entry_optimal']}")
+                    
+                except Exception as e:
+                    print(f"❌ Error procesando {symbol}: {e}")
+                    # Datos por defecto en caso de error
+                    trading_data[symbol] = {
+                        'symbol': symbol,
+                        'current_price': 50000.0,
+                        'signal': {'signal': 'LOADING', 'signal_strength': 0, 'confluence_factors': 0},
+                        'trading_levels': calculate_trading_levels(symbol, 50000.0, {'signal': 'NO_SIGNAL'}),
+                        'last_update': datetime.now().isoformat(),
+                        'data_source': 'fallback'
+                    }
+            
+            return trading_data
+            
+        except Exception as e:
+            print(f"❌ Error generando datos de trading: {e}")
+            return {}
+    def generate_enhanced_signal_analysis(symbol: str, price: float) -> dict:
+        """
+        Genera análisis de señal mejorado (reemplaza con tu lógica real de análisis técnico)
+        """
+        import random
+        
+        # Simular diferentes probabilidades según símbolo
+        if symbol == 'BTCUSDT':
+            signals = ['LONG', 'SHORT', 'WAIT']
+            weights = [0.4, 0.3, 0.3]  # BTC más probabilidad de LONG
+        else:
+            signals = ['LONG', 'SHORT', 'WAIT', 'NO_SIGNAL']
+            weights = [0.25, 0.25, 0.25, 0.25]
+        
+        signal = random.choices(signals, weights=weights)[0]
+        
+        # Fuerza de señal más realista
+        if signal in ['LONG', 'SHORT']:
+            strength = random.randint(60, 95)  # Señales ejecutables
+        elif signal == 'WAIT':
+            strength = random.randint(40, 70)  # Señales de espera
+        else:
+            strength = 0  # Sin señal
+        
+        return {
+            'signal': signal,
+            'signal_strength': strength,
+            'confluence_factors': random.randint(1, 4),
+            'timeframe_analysis': {
+                '4h': signal if signal != 'NO_SIGNAL' else 'NEUTRAL',
+                '1h': signal if signal != 'NO_SIGNAL' else 'NEUTRAL',
+                'daily': random.choice(['BULLISH', 'BEARISH', 'NEUTRAL'])
+            },
+            'technical_indicators': {
+                'ema_11_55': 'BULLISH' if signal == 'LONG' else 'BEARISH' if signal == 'SHORT' else 'NEUTRAL',
+                'adx': random.randint(20, 40),
+                'rsi': random.randint(30, 70),
+                'volume_profile': 'SUPPORT' if signal == 'LONG' else 'RESISTANCE' if signal == 'SHORT' else 'NEUTRAL'
+            }
+        }
+
+    def generate_signal_analysis(symbol: str, price: float) -> dict:
+        """
+        Simula análisis de señal (reemplaza con tu lógica real)
+        """
+        import random
+        
+        signals = ['LONG', 'SHORT', 'WAIT', 'NO_SIGNAL']
+        signal = random.choice(signals)
+        strength = random.randint(45, 95) if signal != 'NO_SIGNAL' else 0
+        
+        return {
+            'signal': signal,
+            'signal_strength': strength,
+            'confluence_factors': random.randint(1, 4),
+            'timeframe_analysis': {
+                '4h': signal,
+                '1h': signal,
+                'daily': random.choice(['BULLISH', 'BEARISH', 'NEUTRAL'])
+            }
+        }
 # Instancias globales
 jaime_merino_indicators = JaimeMerinoIndicators()
 jaime_merino_signal_generator = JaimeMerinoSignalGenerator()

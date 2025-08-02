@@ -634,3 +634,176 @@ body {
     0%, 100% { background: inherit; }
     50% { background: rgba(255, 215, 0, 0.2); }
 }
+/* Botón para mostrar/ocultar Setup de Entradas */
+.card-actions {
+    display: flex;
+    justify-content: center;
+    margin: 1rem 0 1.5rem 0;
+    padding: 0 0.5rem;
+}
+
+.setup-toggle-btn {
+    background: linear-gradient(135deg, #1e40af 0%, #3b82f6 50%, #60a5fa 100%);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    padding: 0.75rem 1.5rem;
+    font-size: 0.85rem;
+    font-weight: 400;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 50px;
+    justify-content: center;
+}
+
+.setup-toggle-btn::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    transition: left 0.5s ease;
+}
+
+.setup-toggle-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(59, 130, 246, 0.4);
+    background: linear-gradient(135deg, #1d4ed8 0%, #2563eb 50%, #3b82f6 100%);
+}
+
+.setup-toggle-btn:hover::before {
+    left: 100%;
+}
+
+.setup-toggle-btn:active {
+    transform: translateY(0);
+    box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);
+}
+
+.setup-toggle-btn.active {
+    background: linear-gradient(135deg, #dc2626 0%, #ef4444 50%, #f87171 100%);
+    box-shadow: 0 4px 15px rgba(239, 68, 68, 0.3);
+}
+
+.setup-toggle-btn.active:hover {
+    background: linear-gradient(135deg, #b91c1c 0%, #dc2626 50%, #ef4444 100%);
+    box-shadow: 0 8px 25px rgba(239, 68, 68, 0.4);
+}
+
+.setup-toggle-btn i {
+    font-size: 0.9rem;
+    transition: transform 0.3s ease;
+}
+
+.setup-toggle-btn:hover i {
+    transform: scale(1.1);
+}
+
+.setup-toggle-btn.active i {
+    transform: rotate(180deg);
+}
+
+/* Variantes para diferentes tipos de señales */
+.setup-toggle-btn.signal-long {
+    background: linear-gradient(135deg, #16a34a 0%, #22c55e 50%, #4ade80 100%);
+    box-shadow: 0 4px 15px rgba(34, 197, 94, 0.3);
+}
+
+.setup-toggle-btn.signal-long:hover {
+    background: linear-gradient(135deg, #15803d 0%, #16a34a 50%, #22c55e 100%);
+    box-shadow: 0 8px 25px rgba(34, 197, 94, 0.4);
+}
+
+.setup-toggle-btn.signal-short {
+    background: linear-gradient(135deg, #dc2626 0%, #ef4444 50%, #f87171 100%);
+    box-shadow: 0 4px 15px rgba(239, 68, 68, 0.3);
+}
+
+.setup-toggle-btn.signal-short:hover {
+    background: linear-gradient(135deg, #b91c1c 0%, #dc2626 50%, #ef4444 100%);
+    box-shadow: 0 8px 25px rgba(239, 68, 68, 0.4);
+}
+
+.setup-toggle-btn.signal-wait {
+    background: linear-gradient(135deg, #d97706 0%, #f59e0b 50%, #fbbf24 100%);
+    box-shadow: 0 4px 15px rgba(245, 158, 11, 0.3);
+}
+
+.setup-toggle-btn.signal-wait:hover {
+    background: linear-gradient(135deg, #b45309 0%, #d97706 50%, #f59e0b 100%);
+    box-shadow: 0 8px 25px rgba(245, 158, 11, 0.4);
+}
+
+/* Efecto pulsante para señales de alta probabilidad */
+.setup-toggle-btn.high-probability {
+    animation: golden-pulse 2s infinite;
+    border: 2px solid #ffd700;
+}
+
+@keyframes golden-pulse {
+    0%, 100% {
+        box-shadow: 0 4px 15px rgba(255, 215, 0, 0.4);
+    }
+    50% {
+        box-shadow: 0 8px 30px rgba(255, 215, 0, 0.6);
+        transform: translateY(-3px) scale(1.02);
+    }
+}
+
+/* Texto dinámico del botón */
+.setup-toggle-btn .btn-text-show {
+    display: inline;
+}
+
+.setup-toggle-btn .btn-text-hide {
+    display: none;
+}
+
+.setup-toggle-btn.active .btn-text-show {
+    display: none;
+}
+
+.setup-toggle-btn.active .btn-text-hide {
+    display: inline;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .setup-toggle-btn {
+        padding: 0.6rem 1.2rem;
+        font-size: 0.8rem;
+        min-width: 160px;
+    }
+    
+    .setup-toggle-btn i {
+        font-size: 0.8rem;
+    }
+}
+
+/* Estado deshabilitado para cuando no hay señal */
+.setup-toggle-btn:disabled {
+    background: linear-gradient(135deg, #6b7280 0%, #9ca3af 50%, #d1d5db 100%);
+    color: #9ca3af;
+    cursor: not-allowed;
+    box-shadow: none;
+    opacity: 0.6;
+}
+
+.setup-toggle-btn:disabled:hover {
+    transform: none;
+    box-shadow: none;
+}
+
+.setup-toggle-btn:disabled::before {
+    display: none;
+}

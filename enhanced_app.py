@@ -679,7 +679,17 @@ def home():
     try:
         # Generar datos iniciales si no existen
         if not trading_data:
-            trading_data = generate_trading_data()
+            print("🔄 Generando datos de trading iniciales...")
+            trading_data = generate_trading_data()  # Llamará a la versión actualizada
+            print(f"✅ Datos generados para {len(trading_data)} símbolos")
+        
+        # Debug: Verificar que tenemos trading_levels
+        for symbol, data in trading_data.items():
+            if 'trading_levels' not in data:
+                print(f"⚠️ FALTA trading_levels en {symbol}")
+            else:
+                entry = data['trading_levels'].get('entry_optimal', 0)
+                print(f"✅ {symbol}: Entrada = ${entry}")
         
         # Preparar datos para el template
         template_data = {
@@ -693,8 +703,8 @@ def home():
                 'market_principle': "Operamos contra el 90% que pierde dinero"
             },
             'stats': {
-                'active_signals': len([s for s in trading_data.values() if s['signal']['signal'] != 'WAIT']),
-                'high_prob_signals': len([s for s in trading_data.values() if s['signal']['signal_strength'] >= 70]),
+                'active_signals': len([s for s in trading_data.values() if s.get('signal', {}).get('signal', 'WAIT') not in ['WAIT', 'NO_SIGNAL']]),
+                'high_prob_signals': len([s for s in trading_data.values() if s.get('signal', {}).get('signal_strength', 0) >= 70]),
                 'symbols_analyzed': f"{len(trading_data)}/{len(SYMBOLS)}"
             }
         }
@@ -703,6 +713,8 @@ def home():
         
     except Exception as e:
         print(f"❌ Error cargando template merino_dashboard.html: {e}")
+        import traceback
+        traceback.print_exc()  # Para debug completo
         # Fallback a template simple
         return f"""
         <h1>🚀 Jaime Merino Trading Bot</h1>
