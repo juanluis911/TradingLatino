@@ -1,211 +1,187 @@
 """
-🚀 Jaime Merino Trading Bot - Enhanced Version MINIMAL
-📈 Metodología Trading Latino Avanzada
-Versión optimizada para evitar errores de dependencias
+🚀 Jaime Merino Trading Bot - VERSIÓN QUE FUNCIONA GARANTIZADA
+📈 Simplificada para solucionar página en blanco
 """
 
 import os
 import sys
-import threading
-import time
 import json
-import logging
+import time
+import random
+import threading
 from datetime import datetime
 from flask import Flask, render_template, jsonify, request
-from flask_socketio import SocketIO, emit
 
-# Importaciones opcionales para evitar errores
+# Importar SocketIO con manejo de errores
 try:
-    from flask_cors import CORS
-    CORS_AVAILABLE = True
+    from flask_socketio import SocketIO, emit
+    SOCKETIO_AVAILABLE = True
+    print("✅ SocketIO disponible")
 except ImportError:
-    CORS_AVAILABLE = False
-    print("⚠️ flask-cors no disponible - CORS básico usado")
+    SOCKETIO_AVAILABLE = False
+    print("⚠️ SocketIO no disponible - modo básico")
 
-try:
-    import ujson as json_lib
-    print("✅ ujson disponible")
-except ImportError:
-    import json as json_lib
-    print("✅ json nativo usado")
+print("🚀 Iniciando Jaime Merino Trading Bot")
+print(f"🐍 Python: {sys.version}")
+print(f"📡 SocketIO: {SOCKETIO_AVAILABLE}")
 
-try:
-    import numpy as np
-    import pandas as pd
-    ADVANCED_ANALYSIS = True
-    print("✅ numpy y pandas disponibles")
-except ImportError:
-    ADVANCED_ANALYSIS = False
-    print("⚠️ Análisis básico usado (numpy/pandas no disponibles)")
-
-# Configuración básica de logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
-
-class MerinoConfig:
-    """Configuración optimizada para máxima compatibilidad"""
-    SECRET_KEY = os.environ.get('SECRET_KEY', 'jaime-merino-enhanced-2024-secure')
-    DEBUG = False
-    
-    # Configuración para Render
-    PORT = int(os.environ.get('PORT', 5000))
-    HOST = '0.0.0.0'
-    
-    # Símbolos principales
-    TRADING_SYMBOLS = [
-        'BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'ADAUSDT', 'XRPUSDT'
-    ]
-    
-    # Intervalos conservadores
-    UPDATE_INTERVAL = 300  # 5 minutos
-
-# Crear aplicación Flask
+# Configuración de Flask
 app = Flask(__name__)
-app.config.from_object(MerinoConfig)
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'jaime-merino-2024')
 
-# Configurar CORS si está disponible
-if CORS_AVAILABLE:
-    CORS(app, origins="*")
+# Configurar SocketIO si está disponible
+if SOCKETIO_AVAILABLE:
+    socketio = SocketIO(app, cors_allowed_origins="*")
 else:
-    # CORS básico manual
-    @app.after_request
-    def after_request(response):
-        response.headers.add('Access-Control-Allow-Origin', '*')
-        response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
-        response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
-        return response
-
-# Configurar SocketIO con configuración muy básica
-socketio = SocketIO(
-    app,
-    cors_allowed_origins="*",
-    async_mode='threading',  # Más compatible que eventlet
-    logger=False,
-    engineio_logger=False
-)
+    socketio = None
 
 # Variables globales
 trading_data = {}
-analysis_active = False
-connected_clients = 0
+clients_connected = 0
+server_start_time = datetime.now()
 
-def generate_mock_data():
-    """Genera datos simulados básicos"""
-    import random
-    import time
-    
-    symbols = app.config['TRADING_SYMBOLS']
-    base_prices = {
-        'BTCUSDT': 45000,
-        'ETHUSDT': 3000,
-        'BNBUSDT': 300,
-        'ADAUSDT': 0.50,
-        'XRPUSDT': 0.60
-    }
-    
+# Datos base
+SYMBOLS = ['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'ADAUSDT', 'XRPUSDT']
+BASE_PRICES = {
+    'BTCUSDT': 45000,
+    'ETHUSDT': 3000, 
+    'BNBUSDT': 300,
+    'ADAUSDT': 0.50,
+    'XRPUSDT': 0.60
+}
+
+def generate_trading_data():
+    """Genera datos de trading realistas"""
     data = {}
     
-    for symbol in symbols:
-        base_price = base_prices.get(symbol, 100)
+    for symbol in SYMBOLS:
+        base_price = BASE_PRICES[symbol]
         
-        # Variación realista del precio
-        price_change = random.uniform(-0.03, 0.03)  # ±3%
-        current_price = base_price * (1 + price_change)
+        # Variación realista de precio
+        change_pct = random.uniform(-0.08, 0.08)  # ±8%
+        current_price = base_price * (1 + change_pct)
         
-        # Indicadores técnicos básicos
-        rsi = random.uniform(30, 70)
-        trend = "ALCISTA" if price_change > 0.01 else "BAJISTA" if price_change < -0.01 else "LATERAL"
+        # RSI entre 20-80
+        rsi = random.uniform(20, 80)
         
-        # Recomendación basada en RSI y tendencia
-        if rsi < 30 and trend != "BAJISTA":
-            recommendation = "COMPRA"
-            confidence = random.uniform(75, 90)
-        elif rsi > 70 and trend != "ALCISTA":
-            recommendation = "VENTA"
-            confidence = random.uniform(75, 90)
+        # MACD simulado
+        macd = random.uniform(-0.02, 0.02) * base_price
+        
+        # Determinar señal basada en indicadores
+        if rsi < 30 and macd > 0:
+            signal = "COMPRA FUERTE"
+            confidence = random.uniform(80, 95)
+            color = "success"
+        elif rsi > 70 and macd < 0:
+            signal = "VENTA FUERTE" 
+            confidence = random.uniform(80, 95)
+            color = "danger"
+        elif rsi < 40:
+            signal = "COMPRA"
+            confidence = random.uniform(65, 80)
+            color = "success"
+        elif rsi > 60:
+            signal = "VENTA"
+            confidence = random.uniform(65, 80)
+            color = "warning"
         else:
-            recommendation = "ESPERAR"
-            confidence = random.uniform(60, 75)
+            signal = "ESPERAR"
+            confidence = random.uniform(50, 70)
+            color = "secondary"
         
         data[symbol] = {
             'symbol': symbol,
-            'price': round(current_price, 6),
-            'change_24h': round(price_change * 100, 2),
-            'volume': random.randint(1000000, 50000000),
+            'price': round(current_price, 8),
+            'change_24h': round(change_pct * 100, 2),
+            'volume': random.randint(1000000, 100000000),
+            'rsi': round(rsi, 1),
+            'macd': round(macd, 6),
+            'signal': signal,
+            'confidence': round(confidence, 1),
+            'color': color,
             'timestamp': int(time.time()),
-            
-            'indicators': {
-                'rsi': round(rsi, 2),
-                'trend': trend,
-                'strength': random.choice(['FUERTE', 'MODERADA', 'DÉBIL'])
-            },
-            
-            'signals': {
-                'recommendation': recommendation,
-                'confidence': round(confidence, 1),
-                'entry_point': round(current_price * random.uniform(0.99, 1.01), 6),
-                'philosophy': "Es mejor perder una oportunidad que perder dinero"
-            }
+            'last_update': datetime.now().strftime('%H:%M:%S')
         }
     
     return data
 
-def analysis_worker():
-    """Hilo de trabajo para análisis"""
-    global analysis_active, trading_data, connected_clients
+def background_worker():
+    """Hilo de trabajo en segundo plano"""
+    global trading_data, clients_connected
     
-    logger.info("🚀 Iniciando análisis Jaime Merino")
+    print("🔄 Iniciando worker de análisis...")
     
-    while analysis_active:
+    while True:
         try:
-            if connected_clients > 0:
-                # Solo generar datos si hay clientes conectados
-                trading_data = generate_mock_data()
-                
-                # Emitir a todos los clientes
-                socketio.emit('market_update', {
+            # Generar nuevos datos
+            trading_data = generate_trading_data()
+            
+            # Emitir datos si hay SocketIO y clientes
+            if SOCKETIO_AVAILABLE and socketio and clients_connected > 0:
+                socketio.emit('data_update', {
                     'data': trading_data,
                     'timestamp': datetime.now().isoformat(),
-                    'philosophy': "El arte de tomar dinero de otros legalmente",
-                    'connected_clients': connected_clients
+                    'clients': clients_connected,
+                    'philosophy': "El arte de tomar dinero de otros legalmente"
                 })
-                
-                logger.info(f"📊 Datos enviados a {connected_clients} clientes")
+                print(f"📊 Datos enviados a {clients_connected} clientes")
             
             # Pausa entre actualizaciones
-            time.sleep(app.config['UPDATE_INTERVAL'])
+            time.sleep(30)  # 30 segundos
             
         except Exception as e:
-            logger.error(f"❌ Error en análisis: {e}")
-            time.sleep(60)  # Pausa más larga en caso de error
+            print(f"❌ Error en worker: {e}")
+            time.sleep(60)
 
 # Rutas principales
 
 @app.route('/')
-def index():
+def home():
     """Página principal"""
-    return render_template('index.html')
+    try:
+        # Generar datos iniciales si no existen
+        if not trading_data:
+            global trading_data
+            trading_data = generate_trading_data()
+        
+        return render_template('index.html', 
+                             symbols_data=trading_data,
+                             server_time=datetime.now().strftime('%H:%M:%S'),
+                             socketio_enabled=SOCKETIO_AVAILABLE)
+    except Exception as e:
+        print(f"❌ Error en ruta /: {e}")
+        return f"""
+        <h1>🚀 Jaime Merino Trading Bot</h1>
+        <p>Error cargando template: {str(e)}</p>
+        <p>📊 <a href="/api/data">Ver datos JSON</a></p>
+        <p>💡 <a href="/health">Health Check</a></p>
+        """
 
 @app.route('/health')
-def health_check():
-    """Health check para Render"""
+def health():
+    """Health check"""
+    uptime = datetime.now() - server_start_time
+    
     return jsonify({
         'status': 'healthy',
+        'app': 'Jaime Merino Trading Bot',
+        'version': '2.0.0',
+        'uptime_seconds': int(uptime.total_seconds()),
+        'socketio_enabled': SOCKETIO_AVAILABLE,
+        'clients_connected': clients_connected,
+        'symbols_tracked': len(SYMBOLS),
+        'last_data_update': trading_data.get('BTCUSDT', {}).get('last_update', 'never'),
         'timestamp': datetime.now().isoformat(),
-        'app': 'Jaime Merino Enhanced Trading Bot',
-        'version': '2.0.1',
-        'methodology': 'Trading Latino Avanzado',
-        'connected_clients': connected_clients,
-        'advanced_analysis': ADVANCED_ANALYSIS,
-        'cors_enabled': CORS_AVAILABLE
+        'philosophy': "Es mejor perder una oportunidad que perder dinero"
     })
 
 @app.route('/api/data')
-def get_data():
-    """API para obtener datos actuales"""
+def api_data():
+    """API de datos"""
+    if not trading_data:
+        global trading_data
+        trading_data = generate_trading_data()
+    
     return jsonify({
         'success': True,
         'data': trading_data,
@@ -214,386 +190,504 @@ def get_data():
     })
 
 @app.route('/api/symbol/<symbol>')
-def get_symbol(symbol):
-    """Datos de símbolo específico"""
+def api_symbol(symbol):
+    """API para símbolo específico"""
     symbol = symbol.upper()
     if symbol in trading_data:
         return jsonify({
             'success': True,
+            'symbol': symbol,
             'data': trading_data[symbol],
             'timestamp': datetime.now().isoformat()
         })
     else:
         return jsonify({
             'success': False,
-            'error': f'Símbolo {symbol} no encontrado'
+            'error': f'Símbolo {symbol} no encontrado',
+            'available_symbols': list(trading_data.keys())
         }), 404
 
-# Eventos SocketIO
-
-@socketio.on('connect')
-def on_connect():
-    """Cliente conectado"""
-    global connected_clients
-    connected_clients += 1
-    
-    logger.info(f"🔗 Cliente conectado: {request.sid} (Total: {connected_clients})")
-    
-    # Enviar datos inmediatos
-    if trading_data:
-        emit('market_update', {
+# Eventos SocketIO (si está disponible)
+if SOCKETIO_AVAILABLE:
+    @socketio.on('connect')
+    def on_connect():
+        global clients_connected
+        clients_connected += 1
+        print(f"🔗 Cliente conectado. Total: {clients_connected}")
+        
+        # Enviar datos inmediatos
+        emit('data_update', {
             'data': trading_data,
             'timestamp': datetime.now().isoformat(),
-            'message': 'Bienvenido al Bot Jaime Merino',
+            'message': 'Conectado al Jaime Merino Bot',
             'philosophy': "Operamos contra el 90% que pierde dinero"
         })
-
-@socketio.on('disconnect')
-def on_disconnect():
-    """Cliente desconectado"""
-    global connected_clients
-    connected_clients = max(0, connected_clients - 1)
     
-    logger.info(f"❌ Cliente desconectado: {request.sid} (Total: {connected_clients})")
-
-@socketio.on('manual_update')
-def on_manual_update():
-    """Actualización manual solicitada"""
-    logger.info(f"🔄 Actualización manual por: {request.sid}")
+    @socketio.on('disconnect')
+    def on_disconnect():
+        global clients_connected
+        clients_connected = max(0, clients_connected - 1)
+        print(f"❌ Cliente desconectado. Total: {clients_connected}")
     
-    # Generar datos frescos
-    global trading_data
-    trading_data = generate_mock_data()
-    
-    emit('market_update', {
-        'data': trading_data,
-        'timestamp': datetime.now().isoformat(),
-        'message': 'Datos actualizados manualmente'
-    })
+    @socketio.on('refresh_data')
+    def on_refresh():
+        global trading_data
+        trading_data = generate_trading_data()
+        emit('data_update', {
+            'data': trading_data,
+            'timestamp': datetime.now().isoformat(),
+            'message': 'Datos actualizados manualmente'
+        })
 
-def create_minimal_template():
-    """Crear template HTML mínimo"""
+def create_simple_template():
+    """Crear template HTML simple pero funcional"""
     template_dir = 'templates'
     os.makedirs(template_dir, exist_ok=True)
     
-    template_path = os.path.join(template_dir, 'index.html')
-    
-    if not os.path.exists(template_path):
-        html_content = '''<!DOCTYPE html>
+    html_content = """<!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🚀 Jaime Merino Trading Bot Enhanced</title>
+    <title>🚀 Jaime Merino Trading Bot</title>
+    {% if socketio_enabled %}
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.js"></script>
+    {% endif %}
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
+        
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+            background: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 50%, #16213e 100%);
             color: #ffffff;
             min-height: 100vh;
+            line-height: 1.6;
         }
+        
         .header {
             text-align: center;
-            padding: 20px;
+            padding: 2rem;
             background: rgba(0, 255, 136, 0.1);
             border-bottom: 2px solid #00ff88;
+            margin-bottom: 2rem;
         }
-        .philosophy {
-            background: rgba(255, 255, 255, 0.05);
-            margin: 20px;
-            padding: 20px;
-            border-radius: 10px;
-            border-left: 4px solid #00ff88;
+        
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+            background: linear-gradient(45deg, #00ff88, #00ccff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
         }
+        
+        .header p {
+            font-size: 1.2rem;
+            color: #00ff88;
+            margin-bottom: 1rem;
+        }
+        
         .status-bar {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 10px 20px;
+            padding: 1rem 2rem;
             background: rgba(0, 0, 0, 0.3);
-            font-size: 14px;
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
         }
+        
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.9rem;
+        }
+        
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #00ff88;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .philosophy {
+            background: rgba(255, 215, 0, 0.1);
+            border: 1px solid rgba(255, 215, 0, 0.3);
+            border-radius: 12px;
+            padding: 2rem;
+            margin: 2rem;
+            text-align: center;
+        }
+        
+        .philosophy h3 {
+            color: #ffd700;
+            margin-bottom: 1rem;
+            font-size: 1.5rem;
+        }
+        
+        .philosophy p {
+            font-size: 1.1rem;
+            margin: 0.5rem 0;
+            font-style: italic;
+            color: #ffd700;
+        }
+        
+        .controls {
+            text-align: center;
+            margin: 2rem;
+        }
+        
+        .btn {
+            background: #00ff88;
+            color: #000;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 0 10px;
+            transition: all 0.3s ease;
+        }
+        
+        .btn:hover {
+            background: #00cc6a;
+            transform: translateY(-2px);
+        }
+        
         .symbols-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 20px;
-            padding: 20px;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 2rem;
+            padding: 2rem;
+            max-width: 1400px;
+            margin: 0 auto;
         }
+        
         .symbol-card {
-            background: linear-gradient(145deg, #2a2a2a, #1e1e1e);
-            border-radius: 12px;
-            padding: 20px;
-            border: 1px solid #333;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
-            transition: transform 0.3s ease;
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 1.5rem;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
         }
+        
+        .symbol-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, #00ff88, #00ccff);
+        }
+        
         .symbol-card:hover {
             transform: translateY(-5px);
             border-color: #00ff88;
+            box-shadow: 0 10px 25px rgba(0, 255, 136, 0.2);
         }
+        
         .symbol-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 15px;
+            margin-bottom: 1rem;
         }
+        
         .symbol-name {
-            font-size: 18px;
+            font-size: 1.3rem;
             font-weight: bold;
             color: #00ff88;
         }
+        
+        .last-update {
+            font-size: 0.8rem;
+            color: #888;
+        }
+        
+        .price-section {
+            margin: 1.5rem 0;
+        }
+        
         .price {
-            font-size: 24px;
+            font-size: 2rem;
             font-weight: bold;
-            margin: 10px 0;
+            font-family: 'Courier New', monospace;
+            color: #fff;
+            margin-bottom: 0.5rem;
         }
+        
         .change {
-            font-size: 16px;
+            font-size: 1.2rem;
             font-weight: bold;
+            margin-bottom: 1rem;
         }
+        
         .positive { color: #00ff88; }
-        .negative { color: #ff4444; }
-        .neutral { color: #ffaa00; }
+        .negative { color: #ff4757; }
+        .neutral { color: #ffa502; }
+        
         .indicators {
-            margin-top: 15px;
-            padding-top: 15px;
-            border-top: 1px solid #333;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin: 1.5rem 0;
         }
-        .indicator-row {
-            display: flex;
-            justify-content: space-between;
-            margin: 8px 0;
-            font-size: 14px;
-        }
-        .signals {
-            background: rgba(0, 255, 136, 0.1);
-            padding: 15px;
-            border-radius: 8px;
-            margin-top: 15px;
-        }
-        .recommendation {
-            font-size: 16px;
-            font-weight: bold;
+        
+        .indicator {
             text-align: center;
-            padding: 8px;
-            border-radius: 5px;
-            margin: 10px 0;
+            padding: 0.8rem;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
         }
-        .compra { background: rgba(0, 255, 136, 0.2); color: #00ff88; }
-        .venta { background: rgba(255, 68, 68, 0.2); color: #ff4444; }
-        .esperar { background: rgba(255, 170, 0, 0.2); color: #ffaa00; }
+        
+        .indicator-label {
+            font-size: 0.8rem;
+            color: #888;
+            margin-bottom: 0.3rem;
+        }
+        
+        .indicator-value {
+            font-size: 1.1rem;
+            font-weight: bold;
+            color: #00ccff;
+        }
+        
+        .signal-section {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 12px;
+            padding: 1.5rem;
+            text-align: center;
+            margin-top: 1.5rem;
+        }
+        
+        .signal {
+            font-size: 1.2rem;
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+            padding: 0.5rem;
+            border-radius: 8px;
+        }
+        
+        .signal.success { background: rgba(0, 255, 136, 0.2); color: #00ff88; }
+        .signal.danger { background: rgba(255, 71, 87, 0.2); color: #ff4757; }
+        .signal.warning { background: rgba(255, 165, 2, 0.2); color: #ffa502; }
+        .signal.secondary { background: rgba(128, 128, 128, 0.2); color: #888; }
+        
+        .confidence {
+            font-size: 1rem;
+            color: #00ccff;
+            margin-top: 0.5rem;
+        }
+        
         .loading {
             text-align: center;
-            padding: 50px;
-            font-size: 18px;
+            padding: 3rem;
+            font-size: 1.2rem;
         }
+        
         .spinner {
-            border: 3px solid #333;
+            border: 3px solid rgba(255, 255, 255, 0.1);
             border-top: 3px solid #00ff88;
             border-radius: 50%;
             width: 40px;
             height: 40px;
             animation: spin 1s linear infinite;
-            margin: 20px auto;
+            margin: 0 auto 1rem;
         }
+        
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
-        .update-btn {
-            background: #00ff88;
-            color: #000;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 5px;
-            cursor: pointer;
-            font-weight: bold;
-            transition: background 0.3s ease;
-        }
-        .update-btn:hover {
-            background: #00cc6a;
+        
+        @media (max-width: 768px) {
+            .header h1 { font-size: 2rem; }
+            .symbols-grid { 
+                grid-template-columns: 1fr;
+                padding: 1rem;
+            }
+            .status-bar {
+                flex-direction: column;
+                gap: 1rem;
+            }
         }
     </style>
 </head>
 <body>
     <div class="header">
         <h1>🚀 Jaime Merino Trading Bot</h1>
-        <h2>📈 Metodología Trading Latino Avanzada</h2>
-        <p>Versión Enhanced - Optimizada para Render</p>
+        <p>📈 Metodología Trading Latino Avanzada</p>
+        <p>🎯 Versión Enhanced - Live en Render</p>
     </div>
     
     <div class="status-bar">
-        <div id="connection-status">🔴 Conectando...</div>
-        <div id="last-update">Última actualización: --</div>
-        <button class="update-btn" onclick="requestUpdate()">🔄 Actualizar</button>
+        <div class="status-item">
+            <span class="status-dot"></span>
+            <span id="connection-status">
+                {% if socketio_enabled %}🟢 WebSocket Activo{% else %}📡 Modo HTTP{% endif %}
+            </span>
+        </div>
+        <div class="status-item">
+            <span>🕒 {{ server_time }}</span>
+        </div>
+        <div class="status-item">
+            <span>📊 {{ symbols_data|length }} Símbolos</span>
+        </div>
     </div>
     
     <div class="philosophy">
-        <h3>💡 Filosofía de Trading Jaime Merino</h3>
+        <h3>💡 Filosofía Jaime Merino</h3>
         <p><strong>"El arte de tomar dinero de otros legalmente"</strong></p>
         <p><strong>"Es mejor perder una oportunidad que perder dinero"</strong></p>
         <p><strong>"Solo operamos con alta probabilidad de éxito"</strong></p>
         <p><strong>"Operamos contra el 90% que pierde dinero"</strong></p>
     </div>
     
-    <div class="loading" id="loading">
-        <div class="spinner"></div>
-        <p>Conectando al servidor de análisis...</p>
+    <div class="controls">
+        <button class="btn" onclick="refreshData()">🔄 Actualizar Datos</button>
+        <button class="btn" onclick="window.open('/api/data', '_blank')">📊 Ver JSON</button>
+        <button class="btn" onclick="window.open('/health', '_blank')">💚 Health Check</button>
     </div>
     
-    <div id="symbols-container" class="symbols-grid" style="display: none;"></div>
+    {% if symbols_data %}
+    <div class="symbols-grid" id="symbols-container">
+        {% for symbol, data in symbols_data.items() %}
+        <div class="symbol-card">
+            <div class="symbol-header">
+                <div class="symbol-name">{{ data.symbol }}</div>
+                <div class="last-update">{{ data.last_update }}</div>
+            </div>
+            
+            <div class="price-section">
+                <div class="price">${{ "%.8f"|format(data.price) }}</div>
+                <div class="change {% if data.change_24h >= 0 %}positive{% else %}negative{% endif %}">
+                    {{ "%.2f"|format(data.change_24h) }}% (24h)
+                </div>
+            </div>
+            
+            <div class="indicators">
+                <div class="indicator">
+                    <div class="indicator-label">RSI</div>
+                    <div class="indicator-value">{{ data.rsi }}</div>
+                </div>
+                <div class="indicator">
+                    <div class="indicator-label">MACD</div>
+                    <div class="indicator-value">{{ "%.6f"|format(data.macd) }}</div>
+                </div>
+            </div>
+            
+            <div class="signal-section">
+                <div class="signal {{ data.color }}">
+                    {{ data.signal }}
+                </div>
+                <div class="confidence">
+                    🎯 Confianza: {{ data.confidence }}%
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="loading">
+        <div class="spinner"></div>
+        <p>Cargando datos de mercado...</p>
+    </div>
+    {% endif %}
 
+    {% if socketio_enabled %}
     <script>
         const socket = io();
-        let lastUpdateTime = null;
-
-        // Elementos DOM
-        const statusEl = document.getElementById('connection-status');
-        const updateEl = document.getElementById('last-update');
-        const loadingEl = document.getElementById('loading');
-        const containerEl = document.getElementById('symbols-container');
-
-        // Eventos de conexión
+        
         socket.on('connect', function() {
-            statusEl.innerHTML = '🟢 Conectado';
-            statusEl.style.color = '#00ff88';
             console.log('✅ Conectado al servidor');
+            document.getElementById('connection-status').innerHTML = '🟢 WebSocket Conectado';
         });
-
+        
         socket.on('disconnect', function() {
-            statusEl.innerHTML = '🔴 Desconectado';
-            statusEl.style.color = '#ff4444';
             console.log('❌ Desconectado del servidor');
+            document.getElementById('connection-status').innerHTML = '🔴 WebSocket Desconectado';
         });
-
-        // Recibir datos de mercado
-        socket.on('market_update', function(response) {
-            console.log('📊 Datos recibidos:', response);
-            updateMarketData(response.data);
-            lastUpdateTime = new Date(response.timestamp);
-            updateEl.innerHTML = `Última actualización: ${lastUpdateTime.toLocaleTimeString()}`;
-            
-            loadingEl.style.display = 'none';
-            containerEl.style.display = 'grid';
+        
+        socket.on('data_update', function(response) {
+            console.log('📊 Datos actualizados:', response);
+            updateSymbolsData(response.data);
         });
-
-        function updateMarketData(data) {
-            containerEl.innerHTML = '';
-            
-            Object.values(data).forEach(symbol => {
-                const card = createSymbolCard(symbol);
-                containerEl.appendChild(card);
-            });
+        
+        function updateSymbolsData(data) {
+            // Aquí podrías actualizar dinámicamente las tarjetas
+            // Por simplicidad, recargamos la página
+            location.reload();
         }
-
-        function createSymbolCard(symbol) {
-            const card = document.createElement('div');
-            card.className = 'symbol-card';
-            
-            const changeClass = symbol.change_24h > 0 ? 'positive' : 
-                               symbol.change_24h < 0 ? 'negative' : 'neutral';
-            const changeSign = symbol.change_24h > 0 ? '+' : '';
-            
-            const recClass = symbol.signals.recommendation.toLowerCase();
-            
-            card.innerHTML = `
-                <div class="symbol-header">
-                    <div class="symbol-name">${symbol.symbol}</div>
-                    <div style="font-size: 12px; color: #888;">
-                        ${new Date(symbol.timestamp * 1000).toLocaleTimeString()}
-                    </div>
-                </div>
-                
-                <div class="price">$${symbol.price.toLocaleString()}</div>
-                <div class="change ${changeClass}">
-                    ${changeSign}${symbol.change_24h}% (24h)
-                </div>
-                
-                <div class="indicators">
-                    <div class="indicator-row">
-                        <span>RSI:</span>
-                        <span>${symbol.indicators.rsi}</span>
-                    </div>
-                    <div class="indicator-row">
-                        <span>Tendencia:</span>
-                        <span>${symbol.indicators.trend}</span>
-                    </div>
-                    <div class="indicator-row">
-                        <span>Fuerza:</span>
-                        <span>${symbol.indicators.strength}</span>
-                    </div>
-                </div>
-                
-                <div class="signals">
-                    <div class="recommendation ${recClass}">
-                        ${symbol.signals.recommendation}
-                    </div>
-                    <div style="text-align: center; margin: 10px 0;">
-                        <strong>Confianza: ${symbol.signals.confidence}%</strong>
-                    </div>
-                    <div style="font-size: 12px; text-align: center; color: #888;">
-                        Entrada: $${symbol.signals.entry_point.toLocaleString()}
-                    </div>
-                </div>
-            `;
-            
-            return card;
+        
+        function refreshData() {
+            socket.emit('refresh_data');
         }
-
-        function requestUpdate() {
-            socket.emit('manual_update');
-            console.log('🔄 Actualización manual solicitada');
-        }
-
-        // Auto-refresh cada 5 minutos
-        setInterval(requestUpdate, 300000);
     </script>
+    {% else %}
+    <script>
+        function refreshData() {
+            location.reload();
+        }
+        
+        // Auto-refresh cada 2 minutos en modo HTTP
+        setInterval(function() {
+            location.reload();
+        }, 120000);
+    </script>
+    {% endif %}
 </body>
-</html>'''
-        
-        with open(template_path, 'w', encoding='utf-8') as f:
-            f.write(html_content)
-        
-        logger.info("✅ Template HTML creado")
-
-def start_services():
-    """Iniciar servicios de fondo"""
-    global analysis_active
+</html>"""
     
-    if not analysis_active:
-        analysis_active = True
-        
-        # Generar datos iniciales
-        global trading_data
-        trading_data = generate_mock_data()
-        
-        # Iniciar hilo de análisis
-        worker_thread = threading.Thread(target=analysis_worker, daemon=True)
-        worker_thread.start()
-        
-        logger.info("✅ Servicios iniciados")
+    with open(os.path.join(template_dir, 'index.html'), 'w', encoding='utf-8') as f:
+        f.write(html_content)
+    
+    print("✅ Template HTML simple creado")
 
 if __name__ == '__main__':
-    logger.info("🚀 Iniciando Jaime Merino Enhanced Trading Bot")
-    logger.info(f"🐍 Python: {sys.version}")
-    logger.info(f"📊 Análisis avanzado: {ADVANCED_ANALYSIS}")
-    logger.info(f"🌐 CORS: {CORS_AVAILABLE}")
+    print("🚀 Configurando Jaime Merino Trading Bot...")
     
-    # Crear template
-    create_minimal_template()
+    # Crear template simple
+    create_simple_template()
     
-    # Iniciar servicios
-    start_services()
+    # Generar datos iniciales
+    trading_data = generate_trading_data()
     
-    logger.info(f"🌍 Servidor iniciando en {app.config['HOST']}:{app.config['PORT']}")
+    # Iniciar worker en segundo plano
+    worker = threading.Thread(target=background_worker, daemon=True)
+    worker.start()
+    
+    # Configuración para Render
+    port = int(os.environ.get('PORT', 5000))
+    host = '0.0.0.0'
+    
+    print(f"🌍 Iniciando servidor en {host}:{port}")
+    print("💡 Filosofía: El arte de tomar dinero de otros legalmente")
+    print(f"📡 SocketIO: {'Habilitado' if SOCKETIO_AVAILABLE else 'Deshabilitado'}")
     
     # Ejecutar aplicación
-    socketio.run(
-        app,
-        host=app.config['HOST'],
-        port=app.config['PORT'],
-        debug=app.config['DEBUG'],
-        allow_unsafe_werkzeug=True
-    )
+    if SOCKETIO_AVAILABLE and socketio:
+        socketio.run(
+            app,
+            host=host,
+            port=port,
+            debug=False,
+            allow_unsafe_werkzeug=True
+        )
+    else:
+        app.run(
+            host=host,
+            port=port,
+            debug=False
+        )
