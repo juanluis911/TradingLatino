@@ -12,6 +12,12 @@ import threading
 import requests
 from datetime import datetime
 from flask import Flask, render_template, jsonify, request
+import sys
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+from services.binance_service import BinanceService
+
+# Inicializar servicio real de Binance
+binance_service = BinanceService()
 
 # Importar SocketIO con manejo de errores
 try:
@@ -50,22 +56,49 @@ BASE_PRICES = {
 }
 
 def get_real_price_reference():
-    """Intenta obtener precios reales de APIs públicas"""
+    """Obtiene precios de múltiples fuentes"""
+    
+    # Método 1: Binance directo (preferido)
+    try:
+        binance_prices = {}
+        for symbol in SYMBOLS:
+            price = binance_service.get_current_price(symbol)
+            if price:
+                binance_prices[symbol] = price
+        
+        if binance_prices:
+            print(f"✅ Precios de Binance obtenidos: {len(binance_prices)} símbolos")
+            return binance_prices
+    except Exception as e:
+        print(f"⚠️ Error Binance: {e}")
+    
+    # Método 2: CoinGecko (backup)
     try:
         response = requests.get(
-            'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum&vs_currencies=usd',
-            timeout=5
+            'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,binancecoin&vs_currencies=usd',
+            timeout=10
         )
         
         if response.status_code == 200:
             data = response.json()
-            return {
-                'BTCUSDT': data.get('bitcoin', {}).get('usd', BASE_PRICES['BTCUSDT']),
-                'ETHUSDT': data.get('ethereum', {}).get('usd', BASE_PRICES['ETHUSDT'])
+            gecko_prices = {
+                'BTCUSDT': data.get('bitcoin', {}).get('usd'),
+                'ETHUSDT': data.get('ethereum', {}).get('usd'),
+                'BNBUSDT': data.get('binancecoin', {}).get('usd')
             }
+            
+            # Filtrar None values
+            gecko_prices = {k: v for k, v in gecko_prices.items() if v is not None}
+            
+            if gecko_prices:
+                print(f"✅ Precios de CoinGecko: {len(gecko_prices)} símbolos")
+                return gecko_prices
+                
     except Exception as e:
-        print(f"⚠️ No se pudo obtener precios reales: {e}")
+        print(f"⚠️ Error CoinGecko: {e}")
     
+    # Método 3: Precios base actualizados (último recurso)
+    print("⚠️ Usando precios base actualizados")
     return BASE_PRICES
 
 def generate_enhanced_analysis(symbol, current_price):
@@ -263,6 +296,51 @@ def background_worker():
             print(f"❌ Error en worker: {e}")
             time.sleep(180)
 
+def get_real_prices():
+    """Obtiene precios reales de Binance"""
+    real_prices = {}
+    
+    for symbol in SYMBOLS:
+        try:
+            # Método 1: Precio directo
+            price = binance_service.get_current_price(symbol)
+            if price:
+                real_prices[symbol] = price
+                continue
+                
+            # Método 2: Market data completo
+            market_data = binance_service.get_market_data(symbol)
+            if market_data:
+                real_prices[symbol] = market_data.close_price
+                continue
+                
+            # Método 3: Solo como último recurso usar fallback
+            real_prices[symbol] = BASE_PRICES.get(symbol, 0)
+            print(f"⚠️ Usando precio fallback para {symbol}")
+            
+        except Exception as e:
+            print(f"❌ Error obteniendo precio real {symbol}: {e}")
+            real_prices[symbol] = BASE_PRICES.get(symbol, 0)
+    
+    return real_prices
+
+def generate_trading_data():
+    """Genera datos usando precios REALES"""
+    global last_prices
+    
+    # ✅ Obtener precios reales
+    real_prices = get_real_prices()
+    
+    data = {}
+    for symbol in SYMBOLS:
+        current_price = real_prices[symbol]
+        
+        # ✅ Usar precio real, no simulado
+        analysis = generate_enhanced_analysis(symbol, current_price)
+        last_prices[symbol] = current_price
+        data[symbol] = analysis
+    
+    return data
 # Rutas principales
 
 @app.route('/')

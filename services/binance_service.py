@@ -44,9 +44,29 @@ class BinanceService:
     # ... aquí van todos los métodos de la clase ...
     
     def get_current_price(self, symbol: str) -> Optional[float]:
-        """Obtiene el precio actual de un símbolo"""
-        # Implementación del método
-        pass
+        """Obtiene precio real de Binance"""
+        max_retries = 3
+        
+        for attempt in range(max_retries):
+            try:
+                if self.client:
+                    # Con credenciales
+                    ticker = self.client.get_symbol_ticker(symbol=symbol)
+                    return float(ticker['price'])
+                else:
+                    # API pública
+                    url = f"{self.base_url}/api/v3/ticker/price"
+                    response = requests.get(url, params={'symbol': symbol}, timeout=10)
+                    response.raise_for_status()
+                    return float(response.json()['price'])
+                    
+            except Exception as e:
+                print(f"❌ Intento {attempt+1} falló para {symbol}: {e}")
+                if attempt == max_retries - 1:
+                    return None
+                time.sleep(1)
+        
+        return None
     
     # services/binance_service.py
 
