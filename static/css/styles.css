@@ -701,6 +701,174 @@
     animation: float 6s ease-in-out infinite;
 }
 
+/* Estilos para sección de futuros */
+.futures-section {
+    margin-top: 20px;
+    padding: 15px;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    border-radius: 10px;
+    border: 1px solid #2a2a3e;
+}
+
+.futures-section h4 {
+    color: #ffd700;
+    margin-bottom: 15px;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.futures-section h5 {
+    color: #e0e0e0;
+    margin: 12px 0 8px 0;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.level-item {
+    display: flex;
+    justify-content: space-between;
+    margin: 5px 0;
+    padding: 3px 0;
+}
+
+.level-item label {
+    color: #b0b0b0;
+    font-size: 12px;
+}
+
+.entry-price {
+    color: #00d4aa !important;
+    font-weight: 600;
+}
+
+.target-price {
+    color: #27ae60 !important;
+    font-weight: 600;
+}
+
+.stop-price {
+    color: #e74c3c !important;
+    font-weight: 600;
+}
+
+.invalidation-price {
+    color: #f39c12 !important;
+    font-weight: 600;
+}
+
+.price-range {
+    color: #3498db;
+    font-size: 12px;
+}
+
+.percentage.positive {
+    color: #27ae60;
+    font-size: 11px;
+    margin-left: 5px;
+}
+
+.percentage.negative {
+    color: #e74c3c;
+    font-size: 11px;
+    margin-left: 5px;
+}
+
+.action {
+    color: #95a5a6;
+    font-size: 10px;
+    font-style: italic;
+    margin-left: 8px;
+}
+
+.management-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 10px;
+    margin: 8px 0;
+}
+
+.management-item {
+    text-align: center;
+    padding: 8px;
+    background: rgba(255,255,255,0.05);
+    border-radius: 5px;
+}
+
+.management-item label {
+    display: block;
+    color: #b0b0b0;
+    font-size: 10px;
+    margin-bottom: 3px;
+}
+
+.management-item .value {
+    color: #ffffff;
+    font-weight: 600;
+    font-size: 13px;
+}
+
+.risk-reward {
+    color: #f39c12 !important;
+}
+
+.invalidation-reason {
+    color: #f39c12;
+    font-size: 11px;
+    font-style: italic;
+    margin-top: 5px;
+    padding: 5px;
+    background: rgba(243, 156, 18, 0.1);
+    border-radius: 3px;
+}
+
+.execution-list {
+    margin: 8px 0;
+    padding-left: 15px;
+}
+
+.execution-list li {
+    color: #e0e0e0;
+    font-size: 11px;
+    margin: 3px 0;
+}
+
+.rules-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin: 8px 0;
+}
+
+.rule-item {
+    display: flex;
+    justify-content: space-between;
+    font-size: 10px;
+    padding: 4px 8px;
+    background: rgba(255,255,255,0.03);
+    border-radius: 3px;
+}
+
+.rule-item span:first-child {
+    color: #b0b0b0;
+}
+
+.rule-item span:last-child {
+    color: #ffffff;
+    font-weight: 500;
+}
+
+/* Responsivo */
+@media (max-width: 768px) {
+    .management-row {
+        grid-template-columns: 1fr;
+        gap: 5px;
+    }
+    
+    .rules-grid {
+        grid-template-columns: 1fr;
+        gap: 5px;
+    }
+}
 @keyframes float {
     0%, 100% {
         transform: translateY(0) rotate(0deg);

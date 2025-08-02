@@ -1,472 +1,397 @@
+# services/enhanced_indicators.py
 """
-Servicio de análisis mejorado implementando la metodología completa de Jaime Merino
+Indicadores mejorados para la metodología de Jaime Merino
 """
+import pandas as pd
+import numpy as np
 from datetime import datetime
-from typing import Optional, Dict
-from services.binance_service import binance_service
-#from services.enhanced_indicators import jaime_merino_signal_generator
-from models.trading_analysis import TradingAnalysis, create_analysis
+from typing import Dict, Optional, Tuple
 from utils.logger import analysis_logger
-from config import Config
 
 logger = analysis_logger
 
-class EnhancedAnalysisService:
+class JaimeMerinoSignalGenerator:
     """
-    Servicio de análisis mejorado siguiendo la metodología exacta de Jaime Merino
+    Generador de señales siguiendo la metodología de Jaime Merino
     """
     
     def __init__(self):
-        """Inicializa el servicio de análisis mejorado"""
-        self.binance = binance_service
-        self.merino_generator = jaime_merino_signal_generator
-        logger.info("🚀 Servicio de análisis mejorado inicializado - Metodología Jaime Merino")
+        logger.info("🎯 Generador de señales Jaime Merino inicializado")
+        self._last_signal_strength = 50
     
-    def analyze_symbol_merino(self, symbol: str) -> Optional[Dict]:
+    def generate_merino_signal(self, df_4h: pd.DataFrame, df_1h: pd.DataFrame, 
+                             current_price: float) -> Dict:
         """
-        Realiza análisis completo siguiendo la metodología de Jaime Merino
+        Genera señal básica siguiendo la metodología de Jaime Merino
         
         Args:
-            symbol: Símbolo a analizar (ej: 'BTCUSDT')
+            df_4h: DataFrame de 4 horas
+            df_1h: DataFrame de 1 hora
+            current_price: Precio actual
             
         Returns:
-            Análisis completo según metodología Merino
+            Diccionario con señal completa
         """
         try:
-            logger.info(f"📊 Iniciando análisis Merino para {symbol}")
+            logger.debug(f"🔍 Generando señal Merino para precio: ${current_price:,.4f}")
             
-            # 1. Obtener datos multi-temporales
-            df_4h = self.binance.get_klines(symbol, interval='4h', limit=100)
-            df_1h = self.binance.get_klines(symbol, interval='1h', limit=50)
-            df_daily = self.binance.get_klines(symbol, interval='1d', limit=30)
+            # 1. Calcular EMAs en 4H
+            ema_11_4h = df_4h['close'].ewm(span=11).mean().iloc[-1]
+            ema_55_4h = df_4h['close'].ewm(span=55).mean().iloc[-1]
             
-            if any(df is None or len(df) < 55 for df in [df_4h, df_1h]):
-                logger.error(f"❌ Insuficientes datos históricos para {symbol}")
-                return None
+            # 2. Calcular EMAs en 1H para timing
+            ema_11_1h = df_1h['close'].ewm(span=11).mean().iloc[-1]
+            ema_55_1h = df_1h['close'].ewm(span=55).mean().iloc[-1]
             
-            # 2. Obtener precio actual
-            current_price = self.binance.get_current_price(symbol)
-            if not current_price:
-                logger.error(f"❌ No se pudo obtener precio actual de {symbol}")
-                return None
+            # 3. Determinar sesgo principal (4H)
+            if ema_11_4h > ema_55_4h * 1.001:  # 0.1% de separación mínima
+                bias = "BULLISH"
+            elif ema_11_4h < ema_55_4h * 0.999:
+                bias = "BEARISH"
+            else:
+                bias = "NEUTRAL"
             
-            # 3. Generar señal completa de Merino
-            merino_signal = self.merino_generator.generate_merino_signal(
-                df_4h, df_1h, current_price
+            # 4. Calcular RSI para momentum
+            rsi = self._calculate_rsi(df_4h['close'])
+            current_rsi = rsi.iloc[-1] if not rsi.empty else 50
+            
+            # 5. Calcular volumen promedio
+            avg_volume = df_4h['volume'].rolling(20).mean().iloc[-1]
+            current_volume = df_4h['volume'].iloc[-1]
+            volume_ratio = current_volume / avg_volume if avg_volume > 0 else 1
+            
+            # ✅ CREAR VOLUME_DATA AQUÍ
+            volume_data = {
+                'vpoc_distance_pct': float((current_price - ema_11_4h) / ema_11_4h * 100),
+                'volume_ratio': float(volume_ratio),
+                'avg_volume': float(avg_volume),
+                'current_volume': float(current_volume)
+            }
+            # 6. Generar señal principal
+            signal = self._determine_basic_signal(
+                bias, current_price, ema_11_4h, ema_55_4h, 
+                ema_11_1h, ema_55_1h, current_rsi, volume_ratio
             )
             
-            # 4. Análisis de contexto de mercado
-            market_context = self._analyze_market_context(df_daily, current_price)
-            
-            # 5. Gestión de capital según filosofía 40-30-20-10
-            capital_allocation = self._calculate_capital_allocation(
-                merino_signal['signal'], merino_signal['signal_strength']
+            # 7. Calcular fuerza de señal
+            signal_strength = self._calculate_basic_strength(
+                signal, bias, current_rsi, volume_ratio, 
+                current_price, ema_11_4h, ema_55_4h
             )
             
-            # 6. Generar análisis textual detallado
-            analysis_text = self._generate_merino_analysis_text(
-                symbol, current_price, merino_signal, market_context
+            # 8. Calcular niveles de trading
+            trading_levels = self._calculate_merino_trading_levels(
+                signal, current_price, ema_11_4h, ema_55_4h, volume_data
+            )
+            self._last_signal_strength = signal_strength
+            # 9. Calcular confluencias
+            confluence_score = self._calculate_basic_confluence(
+                bias, current_rsi, volume_ratio, signal_strength
             )
             
-            # 7. Generar recomendación específica
-            recommendation = self._generate_merino_recommendation(
-                symbol, current_price, merino_signal, capital_allocation
-            )
-            
-            # 8. Compilar resultado final
-            analysis_result = {
-                'symbol': symbol,
-                'timestamp': datetime.now().isoformat(),
-                'current_price': current_price,
-                'methodology': 'JAIME_MERINO',
-                'signal': merino_signal,
-                'market_context': market_context,
-                'capital_allocation': capital_allocation,
-                'analysis_text': analysis_text,
-                'recommendation': recommendation,
-                'risk_management': self._get_risk_management_rules(),
-                'confluence_analysis': self._analyze_confluence(merino_signal)
+            result = {
+                'signal': signal,
+                'signal_strength': int(signal_strength),
+                'bias': bias,
+                'timeframe_4h': {
+                    'ema_11': float(ema_11_4h),
+                    'ema_55': float(ema_55_4h),
+                    'rsi': float(current_rsi),
+                    'volume_ratio': float(volume_ratio)
+                },
+                'timeframe_1h': {
+                    'ema_11': float(ema_11_1h),
+                    'ema_55': float(ema_55_1h)
+                },
+                'volume_profile': {
+                    'vpoc_distance_pct': float((current_price - ema_11_4h) / ema_11_4h * 100),
+                    'volume_ratio': float(volume_ratio)
+                },
+                'trading_levels': trading_levels,
+                'confluence_score': confluence_score
             }
             
-            logger.info(f"✅ Análisis Merino completado para {symbol}: {merino_signal['signal']} ({merino_signal['signal_strength']}%)")
-            return analysis_result
+            logger.info(f"🎯 Señal generada: {signal} ({signal_strength}%) - Sesgo: {bias}")
+            return result
             
         except Exception as e:
-            logger.error(f"❌ Error en análisis Merino de {symbol}: {e}")
-            import traceback
-            logger.error(traceback.format_exc())
-            return None
+            logger.error(f"❌ Error generando señal Merino: {e}")
+            return self._get_empty_signal()
     
-    def _analyze_market_context(self, df_daily: pd.DataFrame, current_price: float) -> Dict:
+    def _determine_basic_signal(self, bias: str, price: float, ema_11_4h: float, 
+                               ema_55_4h: float, ema_11_1h: float, ema_55_1h: float, 
+                               rsi: float, volume_ratio: float) -> str:
+        """Determina la señal básica"""
+        
+        # Condiciones para LONG
+        if (bias == "BULLISH" and 
+            price > ema_11_4h and 
+            ema_11_1h > ema_55_1h and 
+            rsi > 40 and rsi < 80 and 
+            volume_ratio > 0.8):
+            return "LONG"
+        
+        # Condiciones para SHORT
+        elif (bias == "BEARISH" and 
+              price < ema_11_4h and 
+              ema_11_1h < ema_55_1h and 
+              rsi < 60 and rsi > 20 and 
+              volume_ratio > 0.8):
+            return "SHORT"
+        
+        # Sin señal clara
+        elif bias == "NEUTRAL" or volume_ratio < 0.5:
+            return "WAIT"
+        
+        else:
+            return "NO_SIGNAL"
+    
+    def _calculate_basic_strength(self, signal: str, bias: str, rsi: float, 
+                                 volume_ratio: float, price: float, 
+                                 ema_11: float, ema_55: float) -> float:
+        """Calcula la fuerza básica de la señal"""
+        
+        if signal in ["NO_SIGNAL", "WAIT"]:
+            return 0
+        
+        strength = 0
+        
+        # Base por sesgo
+        if bias != "NEUTRAL":
+            strength += 25
+        
+        # RSI en zona favorable
+        if signal == "LONG" and 40 < rsi < 70:
+            strength += 20
+        elif signal == "SHORT" and 30 < rsi < 60:
+            strength += 20
+        
+        # Volumen adecuado
+        if volume_ratio > 1.2:
+            strength += 25
+        elif volume_ratio > 0.8:
+            strength += 15
+        
+        # Distancia de EMAs
+        ema_separation = abs(ema_11 - ema_55) / ema_55 * 100
+        if ema_separation > 1:
+            strength += 20
+        elif ema_separation > 0.5:
+            strength += 10
+        
+        # Posición respecto a EMA 11
+        price_ema_distance = abs(price - ema_11) / ema_11 * 100
+        if price_ema_distance < 0.5:
+            strength += 10
+        
+        return min(100, max(0, strength))
+    
+    def _calculate_basic_levels(self, signal: str, price: float, 
+                               ema_11: float, ema_55: float) -> Dict:
+        """Calcula niveles básicos de trading"""
+        
+        if signal == "LONG":
+            return {
+                'entry': price,
+                'targets': [price * 1.02, price * 1.05],  # +2%, +5%
+                'stop_loss': min(price * 0.98, ema_11 * 0.995)  # -2% o cerca de EMA11
+            }
+        elif signal == "SHORT":
+            return {
+                'entry': price,
+                'targets': [price * 0.98, price * 0.95],  # -2%, -5%
+                'stop_loss': max(price * 1.02, ema_11 * 1.005)  # +2% o cerca de EMA11
+            }
+        else:
+            return {'entry': price, 'targets': [], 'stop_loss': None}
+    
+    def _calculate_basic_confluence(self, bias: str, rsi: float, 
+                                   volume_ratio: float, strength: float) -> int:
+        """Calcula score básico de confluencia"""
+        
+        confluences = 0
+        
+        if bias != "NEUTRAL":
+            confluences += 1
+        if 30 < rsi < 70:
+            confluences += 1
+        if volume_ratio > 1.0:
+            confluences += 1
+        if strength > 50:
+            confluences += 1
+        
+        return confluences
+    
+    def _calculate_rsi(self, prices: pd.Series, period: int = 14) -> pd.Series:
+        """Calcula RSI"""
+        try:
+            delta = prices.diff()
+            gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
+            loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
+            rs = gain / loss
+            rsi = 100 - (100 / (1 + rs))
+            return rsi
+        except Exception:
+            return pd.Series([50] * len(prices), index=prices.index)
+    
+    def _get_empty_signal(self) -> Dict:
+        """Retorna señal vacía"""
+        return {
+            'signal': 'NO_SIGNAL',
+            'signal_strength': 0,
+            'bias': 'NEUTRAL',
+            'timeframe_4h': {},
+            'timeframe_1h': {},
+            'volume_profile': {},
+            'trading_levels': {'entry': 0, 'targets': [], 'stop_loss': None},
+            'confluence_score': 0
+        }
+    def _calculate_merino_trading_levels(self, signal: str, current_price: float, 
+                                    ema_11: float, ema_55: float, volume_data: Dict) -> Dict:
         """
-        Analiza el contexto general del mercado en timeframe diario
+        Calcula niveles de trading según metodología específica de Jaime Merino para futuros
+        
+        Args:
+            signal: Tipo de señal
+            current_price: Precio actual
+            ema_11: EMA 11
+            ema_55: EMA 55
+            volume_data: Datos de volumen
+            
+        Returns:
+            Diccionario con niveles completos para futuros
         """
         try:
-            # EMAs en diario para contexto macro
-            ema_11_daily = df_daily['close'].ewm(span=11).mean().iloc[-1]
-            ema_55_daily = df_daily['close'].ewm(span=55).mean().iloc[-1]
-            
-            # Determinar tendencia macro
-            if ema_11_daily > ema_55_daily:
-                macro_trend = "BULL_MARKET"
-            elif ema_11_daily < ema_55_daily:
-                macro_trend = "BEAR_MARKET"
+            if signal == 'LONG':
+                # ENTRADA LONG según Merino
+                entry_optimal = max(current_price * 1.001, ema_11 * 1.002)  # 0.1% arriba del precio o 0.2% arriba de EMA11
+                entry_range_low = current_price * 0.999  # -0.1%
+                entry_range_high = current_price * 1.005  # +0.5%
+                
+                # TARGETS según filosofía Merino
+                target_1 = current_price * 1.02    # +2% (toma parcial 50%)
+                target_2 = current_price * 1.05    # +5% (toma total)
+                target_3 = current_price * 1.08    # +8% (objetivo extendido)
+                
+                # STOP LOSS conservador según Merino
+                stop_loss_price = min(current_price * 0.98, ema_11 * 0.995)  # -2% o 0.5% bajo EMA11
+                technical_stop = ema_55 * 0.998  # Stop técnico en EMA55
+                
+                # INVALIDACIÓN
+                invalidation_level = ema_11 * 0.99  # Cierre bajo EMA11 con 1% buffer
+                invalidation_reason = "Cierre bajo EMA 11 en 4H invalida setup alcista"
+                
+                # APALANCAMIENTO según Merino
+                recommended_leverage = 2.0 if current_price > ema_11 * 1.01 else 1.5
+                max_leverage = 3.0
+                
+                # GESTIÓN DE POSICIÓN
+                position_size_base = 2.0  # 2% del capital base
+                position_size_aggressive = 3.0  # Para señales > 80%
+                
+            elif signal == 'SHORT':
+                # ENTRADA SHORT según Merino
+                entry_optimal = min(current_price * 0.999, ema_11 * 0.998)  # 0.1% abajo del precio o 0.2% abajo de EMA11
+                entry_range_low = current_price * 0.995  # -0.5%
+                entry_range_high = current_price * 1.001  # +0.1%
+                
+                # TARGETS según filosofía Merino
+                target_1 = current_price * 0.98    # -2% (toma parcial 50%)
+                target_2 = current_price * 0.95    # -5% (toma total)
+                target_3 = current_price * 0.92    # -8% (objetivo extendido)
+                
+                # STOP LOSS conservador según Merino
+                stop_loss_price = max(current_price * 1.02, ema_11 * 1.005)  # +2% o 0.5% arriba de EMA11
+                technical_stop = ema_55 * 1.002  # Stop técnico en EMA55
+                
+                # INVALIDACIÓN
+                invalidation_level = ema_11 * 1.01  # Cierre arriba EMA11 con 1% buffer
+                invalidation_reason = "Cierre arriba EMA 11 en 4H invalida setup bajista"
+                
+                # APALANCAMIENTO según Merino
+                recommended_leverage = 2.0 if current_price < ema_11 * 0.99 else 1.5
+                max_leverage = 3.0
+                
+                # GESTIÓN DE POSICIÓN
+                position_size_base = 2.0  # 2% del capital base
+                position_size_aggressive = 3.0  # Para señales > 80%
+                
             else:
-                macro_trend = "SIDEWAYS"
+                # Sin señal - sin niveles
+                return {
+                    'signal': signal,
+                    'entry_optimal': current_price,
+                    'entry_range': {'low': current_price, 'high': current_price},
+                    'targets': [],
+                    'stop_loss': None,
+                    'position_size_pct': 0.0,
+                    'leverage': {'recommended': 1.0, 'max': 1.0},
+                    'risk_reward': 0.0,
+                    'invalidation': {'level': current_price, 'reason': 'Sin setup válido'}
+                }
             
-            # Calcular volatilidad reciente
-            returns = df_daily['close'].pct_change().dropna()
-            volatility = returns.std() * 100
+            # CÁLCULOS COMUNES
+            risk_amount = abs(entry_optimal - stop_loss_price)
+            reward_amount = abs(target_2 - entry_optimal)
+            risk_reward_ratio = reward_amount / risk_amount if risk_amount > 0 else 0
             
-            # Niveles de soporte/resistencia diarios
-            high_20d = df_daily['high'].tail(20).max()
-            low_20d = df_daily['low'].tail(20).min()
+            # Ajustar tamaño de posición según fuerza de señal
+            signal_strength = getattr(self, '_last_signal_strength', 50)
+            if signal_strength >= 80:
+                position_size = position_size_aggressive
+            elif signal_strength >= 60:
+                position_size = position_size_base * 1.5
+            else:
+                position_size = position_size_base
             
             return {
-                'macro_trend': macro_trend,
-                'ema_11_daily': ema_11_daily,
-                'ema_55_daily': ema_55_daily,
-                'volatility_pct': volatility,
-                'resistance_20d': high_20d,
-                'support_20d': low_20d,
-                'price_vs_resistance': ((current_price - high_20d) / high_20d) * 100,
-                'price_vs_support': ((current_price - low_20d) / low_20d) * 100
+                'signal': signal,
+                'entry_optimal': float(entry_optimal),
+                'entry_range': {
+                    'low': float(entry_range_low),
+                    'high': float(entry_range_high)
+                },
+                'targets': [
+                    {'level': float(target_1), 'percentage': 2.0, 'action': 'Toma parcial 50%'},
+                    {'level': float(target_2), 'percentage': 5.0, 'action': 'Toma total'},
+                    {'level': float(target_3), 'percentage': 8.0, 'action': 'Objetivo extendido'}
+                ],
+                'stop_loss': {
+                    'price': float(stop_loss_price),
+                    'percentage': abs((stop_loss_price - entry_optimal) / entry_optimal * 100),
+                    'technical_stop': float(technical_stop)
+                },
+                'position_size_pct': float(position_size),
+                'leverage': {
+                    'recommended': float(recommended_leverage),
+                    'max': float(max_leverage),
+                    'note': 'Nunca exceder 1:3 según filosofía Merino'
+                },
+                'risk_reward': float(round(risk_reward_ratio, 2)),
+                'invalidation': {
+                    'level': float(invalidation_level),
+                    'reason': invalidation_reason
+                },
+                'execution_plan': {
+                    'entry_method': 'Entrada gradual en 2-3 tramos',
+                    'stop_management': 'Mover a breakeven en +1%',
+                    'profit_taking': 'Seguir targets sin emociones',
+                    'time_limit': '4-8 horas para confirmación'
+                },
+                'merino_rules': {
+                    'max_daily_loss': '6% del capital total',
+                    'max_weekly_loss': '8% del capital total',
+                    'position_correlation': 'Max 2 posiciones correlacionadas',
+                    'review_frequency': 'Cada 4 horas mínimo'
+                }
             }
             
         except Exception as e:
-            logger.error(f"❌ Error analizando contexto de mercado: {e}")
-            return {'macro_trend': 'UNKNOWN', 'volatility_pct': 0}
-    
-    def _calculate_capital_allocation(self, signal: str, strength: int) -> Dict:
-        """
-        Calcula asignación de capital según filosofía 40-30-20-10 de Merino
-        """
-        base_allocation = {
-            'btc_long_term': 40,  # 40% Bitcoin largo plazo
-            'weekly_charts': 30,  # 30% gráficos semanales
-            'daily_trading': 20,  # 20% trading diario
-            'futures': 10         # 10% futuros
-        }
-        
-        # Ajustar según fuerza de señal
-        if signal in ['LONG', 'SHORT'] and strength >= 70:
-            # Señal muy fuerte: aumentar asignación a trading diario
-            trading_allocation = {
-                'position_size': 3.0,  # 3% del capital total
-                'max_risk_per_trade': 1.0,  # 1% máximo riesgo
-                'recommended_timeframe': 'daily_trading'
+            logger.error(f"❌ Error calculando niveles de trading Merino: {e}")
+            return {
+                'signal': 'ERROR',
+                'entry_optimal': current_price,
+                'error': str(e)
             }
-        elif signal in ['LONG', 'SHORT'] and strength >= 50:
-            # Señal moderada
-            trading_allocation = {
-                'position_size': 2.0,  # 2% del capital total
-                'max_risk_per_trade': 1.0,
-                'recommended_timeframe': 'daily_trading'
-            }
-        else:
-            # Sin señal clara: preservar capital
-            trading_allocation = {
-                'position_size': 0.0,
-                'max_risk_per_trade': 0.0,
-                'recommended_timeframe': 'wait'
-            }
-        
-        return {
-            'base_allocation': base_allocation,
-            'current_trade': trading_allocation,
-            'philosophy': '40-30-20-10 (BTC_LT-Weekly-Daily-Futures)'
-        }
-    
-    def _generate_merino_analysis_text(self, symbol: str, price: float, 
-                                     signal: Dict, context: Dict) -> str:
-        """
-        Genera análisis textual detallado al estilo de Jaime Merino
-        """
-        try:
-            timeframe_4h = signal['timeframe_4h']
-            volume_data = signal['volume_profile']
-            adx_data = timeframe_4h.get('adx', {})
-            
-            analysis = f"""📊 ANÁLISIS TÉCNICO JAIME MERINO - {symbol}
-{'='*60}
-
-💰 PRECIO ACTUAL: ${price:,.4f}
-🎯 SEÑAL: {signal['signal']} | FUERZA: {signal['signal_strength']}/100
-📈 SESGO 4H: {signal['bias']} | CONFLUENCIAS: {signal['confluence_score']}/4
-
-🔍 ANÁLISIS MULTI-TEMPORAL:
-{'─'*40}
-📊 Contexto Diario:
-   • Tendencia Macro: {context['macro_trend']}
-   • EMA 11 Diario: ${context.get('ema_11_daily', 0):,.4f}
-   • EMA 55 Diario: ${context.get('ema_55_daily', 0):,.4f}
-   • Volatilidad: {context.get('volatility_pct', 0):.2f}%
-
-⏰ Timeframe 4H (Principal):
-   • EMA 11: ${timeframe_4h.get('ema_11', 0):,.4f}
-   • EMA 55: ${timeframe_4h.get('ema_55', 0):,.4f}
-   • Relación EMAs: {"ALCISTA" if timeframe_4h.get('ema_11', 0) > timeframe_4h.get('ema_55', 0) else "BAJISTA"}
-   • Precio vs EMA11: {((price - timeframe_4h.get('ema_11', price)) / timeframe_4h.get('ema_11', price)) * 100:+.2f}%
-
-📊 INDICADORES CLAVE:
-{'─'*40}
-🎯 ADX (Fuerza de Tendencia):
-   • Valor: {adx_data.get('adx', 0):.1f} | Modificado: {adx_data.get('adx_modified', -23):.1f}
-   • Clasificación: {adx_data.get('strength', 'DESCONOCIDA')}
-   • Pendiente: {"FORTALECIENDO" if adx_data.get('strengthening', False) else "DEBILITANDO"}
-   • Trending: {"SÍ" if adx_data.get('trending', False) else "NO"}
-
-⚡ Squeeze Momentum:
-   • Estado: {"SQUEEZE ON (Consolidación)" if timeframe_4h.get('squeeze', False) else "SQUEEZE OFF (Movimiento)"}
-   • Momentum: {timeframe_4h.get('momentum', 0):+.4f}
-   • Dirección: {"ALCISTA" if timeframe_4h.get('momentum', 0) > 0 else "BAJISTA" if timeframe_4h.get('momentum', 0) < 0 else "NEUTRAL"}
-
-📊 VOLUME PROFILE (VPVR):
-   • VPoC: ${volume_data.get('vpoc', 0):,.4f}
-   • Distancia del VPoC: {volume_data.get('vpoc_distance_pct', 0):+.2f}%
-   • Niveles de Alto Volumen: {len(volume_data.get('high_volume_levels', []))} identificados
-
-💡 METODOLOGÍA JAIME MERINO:
-{'─'*40}
-✅ Criterios Cumplidos:
-   • EMAs alineadas para sesgo: {"✓" if signal['bias'] != 'NEUTRAL' else "✗"}
-   • ADX confirma tendencia: {"✓" if adx_data.get('trending', False) else "✗"}
-   • Momentum direccional: {"✓" if abs(timeframe_4h.get('momentum', 0)) > 0.001 else "✗"}
-   • Sin squeeze (consolidación): {"✓" if not timeframe_4h.get('squeeze', True) else "✗"}
-
-🎯 FILOSOFÍA CONTRARIA:
-   • Operando contra el 90% que pierde
-   • Disciplina > Análisis técnico perfecto
-   • "Solo operamos con alta probabilidad"
-
-📈 NIVELES CRÍTICOS:
-{'─'*40}
-🛡️ Soporte 20D: ${context.get('support_20d', 0):,.4f} ({context.get('price_vs_support', 0):+.2f}%)
-🚫 Resistencia 20D: ${context.get('resistance_20d', 0):,.4f} ({context.get('price_vs_resistance', 0):+.2f}%)
-📊 VPoC: ${volume_data.get('vpoc', 0):,.4f} (Nivel de mayor volumen)
-
-⚠️ EVALUACIÓN DE RIESGO:
-{'─'*40}
-🎲 Riesgo General: {self._assess_risk_level(signal['signal_strength'], adx_data.get('adx', 0))}
-📊 Volatilidad: {context.get('volatility_pct', 0):.2f}% ({"ALTA" if context.get('volatility_pct', 0) > 4 else "MODERADA" if context.get('volatility_pct', 0) > 2 else "BAJA"})
-🔍 Manipulación: {"POSIBLE" if signal['signal_strength'] < 40 else "BAJA"}
-
-⏰ Análisis generado: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}
-📚 Metodología: Jaime Merino - Trading Latino Avanzado"""
-
-            return analysis
-            
-        except Exception as e:
-            logger.error(f"❌ Error generando análisis textual: {e}")
-            return f"Error generando análisis detallado para {symbol}"
-    
-    def _generate_merino_recommendation(self, symbol: str, price: float, 
-                                      signal: Dict, capital: Dict) -> str:
-        """
-        Genera recomendación específica al estilo de Jaime Merino
-        """
-        try:
-            signal_type = signal['signal']
-            strength = signal['signal_strength']
-            levels = signal['trading_levels']
-            
-            if signal_type == 'LONG' and strength >= 50:
-                recommendation = f"""🟢 RECOMENDACIÓN JAIME MERINO: POSICIÓN LARGA
-{'='*55}
-
-✅ SETUP ALCISTA CONFIRMADO:
-   • Sesgo 4H: {signal['bias']}
-   • Confluencias técnicas: {signal['confluence_score']}/4
-   • Fuerza de señal: {strength}% ({"EXCELENTE" if strength > 70 else "BUENA"})
-
-💰 GESTIÓN DE CAPITAL (Filosofía 40-30-20-10):
-   • Asignación recomendada: {capital['current_trade']['position_size']:.1f}% del capital total
-   • Riesgo máximo: {capital['current_trade']['max_risk_per_trade']:.1f}% por operación
-   • Timeframe: Trading diario (20% de la cartera)
-
-🎯 PLAN DE TRADING:
-   • Entrada: ${levels.get('entry', price):,.4f}
-   • Target 1: ${levels.get('targets', [price*1.02])[0]:,.4f} (+2%) - CERRAR 50%
-   • Target 2: ${levels.get('targets', [price*1.02, price*1.05])[1] if len(levels.get('targets', [])) > 1 else price*1.05:,.4f} (+5%) - CERRAR RESTO
-   • Stop Loss: ${levels.get('stop_loss', price*0.98):,.4f} (-2%)
-
-🛡️ REGLAS DE MERINO:
-   • Sin apalancamiento > 1:3
-   • Stop si cierra bajo EMA 11
-   • Máximo 6% pérdida diaria
-   • Máximo 8% pérdida semanal
-
-⚡ EJECUCIÓN:
-   1. Verificar volumen en breakout
-   2. Entrada gradual en 2-3 tramos
-   3. Mover stop a breakeven en +1%
-   4. Seguir plan sin emociones
-
-💡 METODOLOGÍA: "Tomar dinero de otros legalmente"
-⚠️ INVALIDACIÓN: Cierre bajo EMA 11 en 4H"""
-
-            elif signal_type == 'SHORT' and strength >= 50:
-                recommendation = f"""🔴 RECOMENDACIÓN JAIME MERINO: POSICIÓN CORTA
-{'='*55}
-
-✅ SETUP BAJISTA CONFIRMADO:
-   • Sesgo 4H: {signal['bias']}
-   • Confluencias técnicas: {signal['confluence_score']}/4
-   • Fuerza de señal: {strength}% ({"EXCELENTE" if strength > 70 else "BUENA"})
-
-💰 GESTIÓN DE CAPITAL (Filosofía 40-30-20-10):
-   • Asignación recomendada: {capital['current_trade']['position_size']:.1f}% del capital total
-   • Riesgo máximo: {capital['current_trade']['max_risk_per_trade']:.1f}% por operación
-   • Timeframe: Trading diario (20% de la cartera)
-
-🎯 PLAN DE TRADING:
-   • Entrada: ${levels.get('entry', price):,.4f}
-   • Target 1: ${levels.get('targets', [price*0.98])[0]:,.4f} (-2%) - CERRAR 50%
-   • Target 2: ${levels.get('targets', [price*0.98, price*0.95])[1] if len(levels.get('targets', [])) > 1 else price*0.95:,.4f} (-5%) - CERRAR RESTO
-   • Stop Loss: ${levels.get('stop_loss', price*1.02):,.4f} (+2%)
-
-🛡️ REGLAS DE MERINO:
-   • Sin apalancamiento > 1:3
-   • Stop si cierra sobre EMA 11
-   • Máximo 6% pérdida diaria
-   • Máximo 8% pérdida semanal
-
-⚡ EJECUCIÓN:
-   1. Confirmar presión vendedora
-   2. Entrada gradual en 2-3 tramos
-   3. Mover stop a breakeven en +1%
-   4. Mantener disciplina total
-
-💡 METODOLOGÍA: "Operar contra el 90% que pierde"
-⚠️ INVALIDACIÓN: Cierre sobre EMA 11 en 4H"""
-
-            elif signal_type == 'WAIT_SQUEEZE':
-                recommendation = f"""🟡 RECOMENDACIÓN JAIME MERINO: ESPERAR - SQUEEZE DETECTADO
-{'='*60}
-
-⏳ SITUACIÓN: CONSOLIDACIÓN (SQUEEZE ON)
-   • El mercado está en compresión
-   • Esperando expansión de volatilidad
-   • Bollinger Bands dentro de Keltner Channels
-
-📊 ESTADO ACTUAL:
-   • Precio: ${price:,.4f}
-   • Momentum actual: {signal['timeframe_4h'].get('momentum', 0):+.4f}
-   • ADX: {signal['timeframe_4h'].get('adx', {}).get('adx', 0):.1f}
-
-🎯 PLAN DE ACCIÓN:
-   • ESPERAR ruptura del squeeze
-   • Preparar alertas en niveles clave
-   • NO forzar operaciones
-   • Preservar capital es prioridad
-
-🔔 ALERTAS SUGERIDAS:
-   • Ruptura alcista: > ${price * 1.015:,.4f}
-   • Ruptura bajista: < ${price * 0.985:,.4f}
-   • Activación ADX: > 25
-
-💡 FILOSOFÍA MERINO:
-   "Es mejor perder una oportunidad que perder dinero"
-   
-⏰ REVISIÓN: Cada 2-4 horas hasta expansión"""
-
-            else:
-                recommendation = f"""⚪ RECOMENDACIÓN JAIME MERINO: SIN OPERACIÓN
-{'='*50}
-
-🚫 RAZÓN: Condiciones técnicas insuficientes
-   • Fuerza de señal: {strength}% (Mínimo: 50%)
-   • Confluencias: {signal['confluence_score']}/4 (Mínimo: 3/4)
-
-📊 ESTADO ACTUAL:
-   • Señal: {signal_type}
-   • Sesgo: {signal['bias']}
-   • ADX: {signal['timeframe_4h'].get('adx', {}).get('adx', 0):.1f}
-
-💰 ACCIÓN RECOMENDADA:
-   • PRESERVAR CAPITAL (40% en BTC largo plazo)
-   • ESPERAR mejor configuración
-   • MANTENER disciplina
-
-📚 RECORDATORIO MERINO:
-   "Solo operamos con alta probabilidad de éxito"
-   "El dinero no se hace forzando operaciones"
-
-🔍 PRÓXIMA REVISIÓN: 4 horas
-⚠️ NO OPERAR hasta confluencia ≥ 3/4"""
-
-            return recommendation
-            
-        except Exception as e:
-            logger.error(f"❌ Error generando recomendación: {e}")
-            return f"Error generando recomendación para {symbol}"
-    
-    def _assess_risk_level(self, strength: int, adx: float) -> str:
-        """Evalúa el nivel de riesgo"""
-        if strength > 70 and adx > 35:
-            return "BAJO (Setup sólido)"
-        elif strength > 50 and adx > 25:
-            return "MEDIO (Aceptable)"
-        else:
-            return "ALTO (No recomendado)"
-    
-    def _get_risk_management_rules(self) -> Dict:
-        """Retorna las reglas de gestión de riesgo de Merino"""
-        return {
-            'max_risk_per_trade': 1.0,  # 1% máximo por operación
-            'max_daily_loss': 6.0,      # 6% máximo diario
-            'max_weekly_loss': 8.0,     # 8% máximo semanal  
-            'max_monthly_loss': 10.0,   # 10% máximo mensual
-            'leverage_limit': 3.0,      # Máximo 1:3
-            'capital_allocation': '40-30-20-10',
-            'position_sizing': 'Division en 20 partes iguales',
-            'stop_strategy': 'Donde retail NO pone stops'
-        }
-    
-    def _analyze_confluence(self, signal: Dict) -> Dict:
-        """Analiza la confluencia técnica detallada"""
-        confluences = []
-        
-        # EMAs
-        if signal['bias'] != 'NEUTRAL':
-            confluences.append({
-                'factor': 'EMAs alineadas',
-                'status': True,
-                'description': f"EMA 11 {'>' if signal['bias'] == 'BULLISH' else '<'} EMA 55"
-            })
-        
-        # ADX
-        adx_data = signal['timeframe_4h'].get('adx', {})
-        if adx_data.get('trending', False):
-            confluences.append({
-                'factor': 'ADX trending',
-                'status': True,
-                'description': f"ADX {adx_data.get('adx', 0):.1f} > 25"
-            })
-        
-        # Momentum
-        momentum = signal['timeframe_4h'].get('momentum', 0)
-        if abs(momentum) > 0.001:
-            confluences.append({
-                'factor': 'Momentum direccional', 
-                'status': True,
-                'description': f"Momentum {momentum:+.4f}"
-            })
-        
-        # Volume Profile
-        vpoc_distance = signal['volume_profile'].get('vpoc_distance_pct', 100)
-        if abs(vpoc_distance) < 3:
-            confluences.append({
-                'factor': 'Cerca del VPoC',
-                'status': True, 
-                'description': f"Distancia VPoC: {vpoc_distance:+.2f}%"
-            })
-        
-        return {
-            'total_confluences': len(confluences),
-            'details': confluences,
-            'strength': 'ALTA' if len(confluences) >= 3 else 'MEDIA' if len(confluences) >= 2 else 'BAJA'
-        }
-
-# Instancia global del servicio mejorado
-enhanced_analysis_service = EnhancedAnalysisService()
+# Instancia global
+jaime_merino_signal_generator = JaimeMerinoSignalGenerator()

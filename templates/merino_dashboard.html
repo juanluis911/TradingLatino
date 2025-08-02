@@ -3,23 +3,28 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Jaime Merino Trading Bot - Metodología Trading Latino</title>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css" rel="stylesheet">
+    <title>Jaime Merino Trading Bot - Dashboard</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
     <style>
         :root {
-            --primary-color: #2c3e50;
-            --secondary-color: #3498db;
-            --success-color: #27ae60;
-            --danger-color: #e74c3c;
-            --warning-color: #f39c12;
-            --info-color: #8e44ad;
-            --dark-bg: #1a1a1a;
-            --card-bg: #2d3436;
-            --text-primary: #ffffff;
-            --text-secondary: #b2bec3;
-            --border-color: #636e72;
-            --gradient-bg: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --bg-primary: #0B1426;
+            --bg-secondary: #1A2332;
+            --bg-card: #1E2A3A;
+            --accent-gold: #FFD700;
+            --accent-blue: #3B82F6;
+            --success: #10B981;
+            --danger: #EF4444;
+            --warning: #F59E0B;
+            --text-primary: #F8FAFC;
+            --text-secondary: #CBD5E1;
+            --text-muted: #64748B;
+            --border: #334155;
+            --border-light: #475569;
+            --shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            --shadow-lg: 0 20px 50px rgba(0, 0, 0, 0.4);
+            --glow: 0 0 20px rgba(255, 215, 0, 0.3);
         }
 
         * {
@@ -29,158 +34,161 @@
         }
 
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: var(--dark-bg);
+            font-family: 'Inter', 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, var(--bg-primary) 0%, #0F1B2E 50%, var(--bg-secondary) 100%);
             color: var(--text-primary);
-            line-height: 1.6;
+            min-height: 100vh;
             overflow-x: hidden;
         }
 
+        /* Header Elegante */
         .header {
-            background: var(--gradient-bg);
-            padding: 1rem 0;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
-            position: relative;
-            overflow: hidden;
-        }
-
-        .header::before {
-            content: '';
-            position: absolute;
+            background: linear-gradient(135deg, rgba(26, 35, 50, 0.95) 0%, rgba(14, 20, 38, 0.95) 100%);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--border);
+            padding: 1.5rem 2rem;
+            position: sticky;
             top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grain" width="100" height="100" patternUnits="userSpaceOnUse"><circle cx="25" cy="25" r="1" fill="rgba(255,255,255,0.1)"/><circle cx="75" cy="75" r="1" fill="rgba(255,255,255,0.1)"/></pattern></defs><rect width="100" height="100" fill="url(%23grain)"/></svg>');
-            opacity: 0.3;
+            z-index: 100;
+            box-shadow: var(--shadow);
         }
 
         .header-content {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 0 2rem;
-            position: relative;
-            z-index: 1;
-        }
-
-        .header h1 {
-            font-size: 2.5rem;
-            font-weight: 700;
-            text-align: center;
-            margin-bottom: 0.5rem;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
-        }
-
-        .header .subtitle {
-            text-align: center;
-            font-size: 1.2rem;
-            opacity: 0.9;
-            margin-bottom: 1rem;
-        }
-
-        .philosophy-banner {
-            background: rgba(255,255,255,0.1);
-            border-radius: 10px;
-            padding: 1rem;
-            text-align: center;
-            font-style: italic;
-            font-size: 1.1rem;
-            backdrop-filter: blur(10px);
-        }
-
-        .main-container {
             max-width: 1400px;
-            margin: 2rem auto;
-            padding: 0 1rem;
-            display: grid;
-            grid-template-columns: 1fr 350px;
-            gap: 2rem;
-        }
-
-        .content-area {
+            margin: 0 auto;
             display: flex;
-            flex-direction: column;
-            gap: 2rem;
-        }
-
-        .card {
-            background: var(--card-bg);
-            border-radius: 15px;
-            padding: 1.5rem;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-            border: 1px solid var(--border-color);
-            transition: all 0.3s ease;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 3px;
-            background: var(--gradient-bg);
-        }
-
-        .card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 15px 40px rgba(0,0,0,0.4);
-        }
-
-        .card-header {
-            display: flex;
-            align-items: center;
             justify-content: space-between;
-            margin-bottom: 1.5rem;
-            padding-bottom: 1rem;
-            border-bottom: 1px solid var(--border-color);
+            align-items: center;
         }
 
-        .card-title {
-            font-size: 1.4rem;
-            font-weight: 600;
+        .logo-section {
             display: flex;
             align-items: center;
-            gap: 0.5rem;
+            gap: 1rem;
         }
 
-        .status-indicator {
+        .logo-icon {
+            width: 50px;
+            height: 50px;
+            background: linear-gradient(135deg, var(--accent-gold), #FFA500);
+            border-radius: 12px;
             display: flex;
             align-items: center;
-            gap: 0.5rem;
+            justify-content: center;
+            font-size: 1.5rem;
+            color: var(--bg-primary);
+            box-shadow: var(--glow);
+        }
+
+        .brand-text h1 {
+            font-size: 1.8rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--accent-gold), #FFA500);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .brand-text .subtitle {
             font-size: 0.9rem;
+            color: var(--text-secondary);
+            margin-top: 0.2rem;
+        }
+
+        .header-stats {
+            display: flex;
+            gap: 2rem;
+            align-items: center;
+        }
+
+        .stat-item {
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: var(--accent-gold);
+        }
+
+        .stat-label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .connection-status {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid var(--success);
+            border-radius: 20px;
+            font-size: 0.85rem;
         }
 
         .status-dot {
             width: 8px;
             height: 8px;
             border-radius: 50%;
+            background: var(--success);
             animation: pulse 2s infinite;
         }
-
-        .status-dot.connected { background: var(--success-color); }
-        .status-dot.disconnected { background: var(--danger-color); }
-        .status-dot.analyzing { background: var(--warning-color); }
 
         @keyframes pulse {
             0%, 100% { opacity: 1; }
             50% { opacity: 0.5; }
         }
 
-        .controls-section {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 1rem;
-            margin-bottom: 2rem;
+        /* Layout Principal */
+        .main-layout {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+            display: grid;
+            grid-template-columns: 1fr 350px;
+            gap: 2rem;
         }
 
-        .btn {
-            padding: 0.8rem 1.5rem;
+        /* Panel de Control */
+        .control-panel {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            box-shadow: var(--shadow);
+        }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .panel-title {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .controls-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 1rem;
+        }
+
+        .control-btn {
+            padding: 0.75rem 1rem;
             border: none;
-            border-radius: 8px;
-            font-size: 0.9rem;
+            border-radius: 10px;
+            font-size: 0.85rem;
             font-weight: 600;
             cursor: pointer;
             transition: all 0.3s ease;
@@ -190,7 +198,7 @@
             overflow: hidden;
         }
 
-        .btn::before {
+        .control-btn::before {
             content: '';
             position: absolute;
             top: 0;
@@ -201,790 +209,1147 @@
             transition: left 0.5s;
         }
 
-        .btn:hover::before {
+        .control-btn:hover::before {
             left: 100%;
         }
 
         .btn-primary {
-            background: var(--secondary-color);
+            background: linear-gradient(135deg, var(--accent-blue), #2563EB);
             color: white;
+            border: 1px solid transparent;
         }
 
         .btn-success {
-            background: var(--success-color);
+            background: linear-gradient(135deg, var(--success), #059669);
             color: white;
+            border: 1px solid transparent;
         }
 
         .btn-warning {
-            background: var(--warning-color);
+            background: linear-gradient(135deg, var(--warning), #D97706);
             color: white;
+            border: 1px solid transparent;
         }
 
-        .btn-danger {
-            background: var(--danger-color);
-            color: white;
+        .btn-gold {
+            background: linear-gradient(135deg, var(--accent-gold), #FFA500);
+            color: var(--bg-primary);
+            border: 1px solid transparent;
+            font-weight: 700;
         }
 
-        .btn:hover {
+        .control-btn:hover {
             transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.3);
         }
 
-        .symbol-grid {
+        /* Grilla de Símbolos */
+        .symbols-section {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 1.5rem;
+            box-shadow: var(--shadow);
+        }
+
+        .symbols-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
             gap: 1.5rem;
         }
 
-        .symbol-card {
-            background: rgba(255,255,255,0.05);
-            border-radius: 10px;
+        /* Tarjeta de Trading Mejorada */
+        .trading-card {
+            background: linear-gradient(135deg, rgba(30, 42, 58, 0.8) 0%, rgba(26, 35, 50, 0.8) 100%);
+            border: 1px solid var(--border-light);
+            border-radius: 16px;
             padding: 1.5rem;
-            border: 1px solid var(--border-color);
             transition: all 0.3s ease;
             position: relative;
+            overflow: hidden;
         }
 
-        .symbol-card:hover {
-            background: rgba(255,255,255,0.1);
-            transform: scale(1.02);
+        .trading-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, var(--accent-gold), var(--accent-blue));
+            opacity: 0;
+            transition: opacity 0.3s ease;
         }
 
-        .symbol-header {
+        .trading-card:hover {
+            transform: translateY(-5px);
+            box-shadow: var(--shadow-lg);
+            border-color: var(--accent-gold);
+        }
+
+        .trading-card:hover::before {
+            opacity: 1;
+        }
+
+        .card-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .symbol-info {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
         }
 
         .symbol-name {
-            font-size: 1.3rem;
+            font-size: 1.4rem;
             font-weight: 700;
-            color: var(--secondary-color);
+            color: var(--text-primary);
+        }
+
+        .symbol-price {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--accent-gold);
+        }
+
+        .signal-badges {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            align-items: flex-end;
         }
 
         .signal-badge {
-            padding: 0.3rem 0.8rem;
+            padding: 0.4rem 0.8rem;
             border-radius: 20px;
-            font-size: 0.8rem;
-            font-weight: 600;
+            font-size: 0.75rem;
+            font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.5px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
         }
 
-        .signal-long { background: var(--success-color); color: white; }
-        .signal-short { background: var(--danger-color); color: white; }
-        .signal-wait { background: var(--warning-color); color: white; }
-        .signal-no-signal { background: var(--border-color); color: white; }
+        .signal-long { background: linear-gradient(135deg, var(--success), #059669); color: white; }
+        .signal-short { background: linear-gradient(135deg, var(--danger), #DC2626); color: white; }
+        .signal-wait { background: linear-gradient(135deg, var(--warning), #D97706); color: white; }
+        .signal-no_signal { background: linear-gradient(135deg, #6B7280, #4B5563); color: white; }
+        .signal-loading { background: linear-gradient(135deg, var(--accent-blue), #2563EB); color: white; }
 
-        .symbol-data {
+        .strength-badge {
+            padding: 0.3rem 0.6rem;
+            border-radius: 15px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            background: rgba(255, 215, 0, 0.1);
+            border: 1px solid var(--accent-gold);
+            color: var(--accent-gold);
+        }
+
+        /* Sección de Futuros Mejorada */
+        .futures-section {
+            margin-top: 1.5rem;
+            padding: 1.5rem;
+            background: linear-gradient(135deg, rgba(15, 23, 42, 0.6) 0%, rgba(30, 41, 59, 0.6) 100%);
+            border: 1px solid rgba(255, 215, 0, 0.2);
+            border-radius: 12px;
+            backdrop-filter: blur(10px);
+        }
+
+        .futures-header {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 1.5rem;
+            color: var(--accent-gold);
+            font-weight: 600;
+            font-size: 1rem;
+        }
+
+        .futures-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+        }
+
+        .futures-column {
+            display: flex;
+            flex-direction: column;
             gap: 1rem;
-            margin-bottom: 1rem;
         }
 
-        .data-item {
-            text-align: center;
+        .level-group {
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 8px;
+            padding: 1rem;
+            border: 1px solid rgba(255, 255, 255, 0.1);
         }
 
-        .data-label {
-            font-size: 0.8rem;
-            color: var(--text-secondary);
-            margin-bottom: 0.3rem;
-        }
-
-        .data-value {
-            font-size: 1.1rem;
+        .level-title {
+            font-size: 0.85rem;
             font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 0.8rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
         }
 
-        .strength-bar {
-            width: 100%;
-            height: 8px;
-            background: rgba(255,255,255,0.1);
-            border-radius: 4px;
-            overflow: hidden;
+        .level-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
             margin: 0.5rem 0;
+            padding: 0.3rem 0;
+            font-size: 0.85rem;
         }
 
-        .strength-fill {
-            height: 100%;
-            transition: width 0.5s ease;
-            border-radius: 4px;
+        .level-label {
+            color: var(--text-muted);
+            font-weight: 500;
         }
 
+        .level-value {
+            font-weight: 600;
+            font-family: 'Monaco', 'Consolas', monospace;
+        }
+
+        .price-entry { color: #00E5D4; }
+        .price-target { color: var(--success); }
+        .price-stop { color: var(--danger); }
+        .price-invalidation { color: var(--warning); }
+
+        .target-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.4rem 0.8rem;
+            margin: 0.3rem 0;
+            background: rgba(16, 185, 129, 0.1);
+            border-radius: 6px;
+            border-left: 3px solid var(--success);
+        }
+
+        .percentage {
+            font-size: 0.75rem;
+            font-weight: 600;
+            padding: 0.2rem 0.5rem;
+            border-radius: 10px;
+        }
+
+        .percentage.positive {
+            background: rgba(16, 185, 129, 0.2);
+            color: var(--success);
+        }
+
+        .percentage.negative {
+            background: rgba(239, 68, 68, 0.2);
+            color: var(--danger);
+        }
+
+        .management-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 0.8rem;
+            margin-top: 1rem;
+        }
+
+        .management-item {
+            text-align: center;
+            padding: 0.8rem;
+            background: rgba(59, 130, 246, 0.1);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+
+        .management-item:hover {
+            background: rgba(59, 130, 246, 0.2);
+            transform: scale(1.02);
+        }
+
+        .management-value {
+            font-size: 1rem;
+            font-weight: 700;
+            color: var(--accent-blue);
+        }
+
+        .management-label {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-top: 0.3rem;
+        }
+
+        /* Sidebar Elegante */
         .sidebar {
             display: flex;
             flex-direction: column;
             gap: 1.5rem;
         }
 
-        .market-overview {
-            background: var(--card-bg);
-            border-radius: 15px;
+        .sidebar-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
             padding: 1.5rem;
-            border: 1px solid var(--border-color);
+            box-shadow: var(--shadow);
+        }
+
+        .market-overview {
+            text-align: center;
+        }
+
+        .btc-display {
+            margin: 1.5rem 0;
         }
 
         .btc-price {
-            text-align: center;
-            margin-bottom: 1.5rem;
-        }
-
-        .btc-price .price {
-            font-size: 2rem;
+            font-size: 2.2rem;
             font-weight: 700;
-            color: var(--warning-color);
+            color: var(--accent-gold);
+            font-family: 'Monaco', 'Consolas', monospace;
         }
 
-        .btc-price .change {
+        .btc-change {
             font-size: 1rem;
+            font-weight: 600;
             margin-top: 0.5rem;
         }
 
-        .change.positive { color: var(--success-color); }
-        .change.negative { color: var(--danger-color); }
+        .btc-change.positive { color: var(--success); }
+        .btc-change.negative { color: var(--danger); }
 
         .philosophy-card {
-            background: linear-gradient(135deg, var(--info-color), var(--secondary-color));
-            color: white;
+            background: linear-gradient(135deg, rgba(255, 215, 0, 0.1) 0%, rgba(255, 165, 0, 0.1) 100%);
+            border: 1px solid rgba(255, 215, 0, 0.3);
             text-align: center;
-            position: relative;
         }
 
-        .philosophy-card::before {
-            content: '"';
-            font-size: 4rem;
-            position: absolute;
-            top: -0.5rem;
-            left: 1rem;
-            opacity: 0.3;
-        }
-
-        .philosophy-text {
-            font-style: italic;
+        .philosophy-quote {
             font-size: 1.1rem;
+            font-style: italic;
+            color: var(--accent-gold);
             margin-bottom: 1rem;
-        }
-
-        .philosophy-author {
-            font-weight: 600;
-            font-size: 0.9rem;
-            opacity: 0.9;
-        }
-
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 1rem;
-        }
-
-        .stat-item {
-            text-align: center;
-            padding: 1rem;
-            background: rgba(255,255,255,0.05);
-            border-radius: 8px;
-            border: 1px solid var(--border-color);
-        }
-
-        .stat-number {
-            font-size: 1.5rem;
-            font-weight: 700;
-            color: var(--secondary-color);
-        }
-
-        .stat-label {
-            font-size: 0.8rem;
-            color: var(--text-secondary);
-            margin-top: 0.3rem;
-        }
-
-        .risk-management {
-            background: rgba(231, 76, 60, 0.1);
-            border: 1px solid var(--danger-color);
-        }
-
-        .risk-allocation {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 0.5rem;
-            margin-top: 1rem;
-        }
-
-        .allocation-item {
-            text-align: center;
-            padding: 0.5rem;
-            background: rgba(255,255,255,0.05);
-            border-radius: 5px;
-            font-size: 0.9rem;
-        }
-
-        .log-console {
-            background: #000;
-            color: #00ff00;
-            font-family: 'Courier New', monospace;
-            padding: 1rem;
-            border-radius: 8px;
-            height: 200px;
-            overflow-y: auto;
-            font-size: 0.8rem;
             line-height: 1.4;
         }
 
+        .philosophy-author {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            font-weight: 600;
+        }
+
+        /* Console de Logs */
+        .console-card {
+            height: 300px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .console-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .console-content {
+            flex: 1;
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1rem;
+            font-family: 'Monaco', 'Consolas', monospace;
+            font-size: 0.8rem;
+            overflow-y: auto;
+            color: var(--success);
+        }
+
         .log-entry {
-            margin-bottom: 0.3rem;
+            margin: 0.3rem 0;
+            display: flex;
+            gap: 0.5rem;
         }
 
         .log-timestamp {
-            color: #888;
-        }
-
-        .loading-spinner {
-            display: inline-block;
-            width: 16px;
-            height: 16px;
-            border: 2px solid var(--border-color);
-            border-top: 2px solid var(--secondary-color);
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-
-        .notification {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            padding: 1rem 1.5rem;
-            border-radius: 8px;
-            color: white;
+            color: var(--text-muted);
             font-weight: 600;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
-            transform: translateX(400px);
-            transition: transform 0.3s ease;
-            z-index: 1000;
         }
 
-        .notification.show {
-            transform: translateX(0);
-        }
+        .log-level-info { color: var(--accent-blue); }
+        .log-level-success { color: var(--success); }
+        .log-level-warning { color: var(--warning); }
+        .log-level-error { color: var(--danger); }
 
-        .notification.success { background: var(--success-color); }
-        .notification.error { background: var(--danger-color); }
-        .notification.warning { background: var(--warning-color); }
-        .notification.info { background: var(--info-color); }
-
-        @media (max-width: 1024px) {
-            .main-container {
+        /* Responsivo */
+        @media (max-width: 1200px) {
+            .main-layout {
                 grid-template-columns: 1fr;
-                gap: 1rem;
             }
             
             .sidebar {
                 order: -1;
             }
+            
+            .symbols-grid {
+                grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            }
         }
 
         @media (max-width: 768px) {
-            .header h1 {
-                font-size: 2rem;
-            }
-            
-            .controls-section {
+            .header-content {
                 flex-direction: column;
+                gap: 1rem;
             }
             
-            .symbol-grid {
+            .header-stats {
+                flex-wrap: wrap;
+                gap: 1rem;
+            }
+            
+            .futures-grid {
                 grid-template-columns: 1fr;
             }
             
-            .stats-grid {
+            .management-grid {
                 grid-template-columns: 1fr;
             }
+            
+            .controls-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Animaciones */
+        .fade-in {
+            animation: fadeIn 0.5s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .highlight {
+            animation: highlight 2s ease-in-out;
+        }
+
+        @keyframes highlight {
+            0%, 100% { background: inherit; }
+            50% { background: rgba(255, 215, 0, 0.2); }
         }
     </style>
 </head>
 <body>
+    <!-- Header Premium -->
     <header class="header">
         <div class="header-content">
-            <h1><i class="fas fa-chart-line"></i> Jaime Merino Trading Bot</h1>
-            <p class="subtitle">Metodología Trading Latino - Análisis Técnico Avanzado</p>
-            <div class="philosophy-banner">
-                <i class="fas fa-quote-left"></i>
-                "El arte de tomar dinero de otros legalmente"
-                <i class="fas fa-quote-right"></i>
+            <div class="logo-section">
+                <div class="logo-icon">
+                    <i class="fas fa-chart-line"></i>
+                </div>
+                <div class="brand-text">
+                    <h1>Jaime Merino Trading Bot</h1>
+                    <div class="subtitle">Metodología Trading Latino - Análisis Técnico Profesional</div>
+                </div>
+            </div>
+            
+            <div class="header-stats">
+                <div class="stat-item">
+                    <div class="stat-value" id="active-signals">0</div>
+                    <div class="stat-label">Señales Activas</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="high-prob-signals">0</div>
+                    <div class="stat-label">Alta Probabilidad</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="portfolio-change">+0.00%</div>
+                    <div class="stat-label">Rendimiento Hoy</div>
+                </div>
+                <div class="connection-status" id="connection-status">
+                    <span class="status-dot"></span>
+                    <span>Conectado</span>
+                </div>
             </div>
         </div>
     </header>
 
-    <div class="main-container">
-        <div class="content-area">
-            <!-- Control Panel -->
-            <div class="card">
-                <div class="card-header">
-                    <h2 class="card-title">
+    <!-- Layout Principal -->
+    <div class="main-layout">
+        <!-- Contenido Principal -->
+        <div class="main-content">
+            <!-- Panel de Control -->
+            <div class="control-panel">
+                <div class="panel-header">
+                    <div class="panel-title">
                         <i class="fas fa-cogs"></i>
                         Panel de Control
-                    </h2>
-                    <div class="status-indicator">
-                        <span class="status-dot connected" id="connection-status"></span>
-                        <span id="connection-text">Conectado</span>
+                    </div>
+                    <div class="connection-status" style="font-size: 0.8rem;">
+                        <span class="status-dot"></span>
+                        <span id="server-time">--:--:--</span>
                     </div>
                 </div>
                 
-                <div class="controls-section">
-                    <button class="btn btn-primary" id="analyze-all-btn">
+                <div class="controls-grid">
+                    <button class="control-btn btn-primary" id="analyze-all-btn">
                         <i class="fas fa-chart-bar"></i>
                         Analizar Todos
                     </button>
-                    <button class="btn btn-success" id="btc-analysis-btn">
+                    <button class="control-btn btn-success" id="btc-analysis-btn">
                         <i class="fab fa-bitcoin"></i>
                         Análisis BTC
                     </button>
-                    <button class="btn btn-warning" id="philosophy-btn">
+                    <button class="control-btn btn-gold" id="philosophy-btn">
                         <i class="fas fa-brain"></i>
                         Filosofía Merino
                     </button>
-                    <button class="btn btn-danger" id="clear-cache-btn">
-                        <i class="fas fa-trash"></i>
-                        Limpiar Cache
+                    <button class="control-btn btn-warning" id="refresh-btn">
+                        <i class="fas fa-sync-alt"></i>
+                        Actualizar
                     </button>
                 </div>
             </div>
 
-            <!-- Trading Signals -->
-            <div class="card">
-                <div class="card-header">
-                    <h2 class="card-title">
-                        <i class="fas fa-signal"></i>
-                        Señales de Trading
-                    </h2>
-                    <div class="status-indicator">
-                        <span id="signals-count">0</span> señales activas
+            <!-- Sección de Símbolos -->
+            <div class="symbols-section">
+                <div class="panel-header">
+                    <div class="panel-title">
+                        <i class="fas fa-coins"></i>
+                        Análisis de Trading
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="symbols-analyzed">0/2</div>
+                        <div class="stat-label">Símbolos Analizados</div>
                     </div>
                 </div>
                 
-                <div class="symbol-grid" id="symbols-container">
-                    <!-- Los símbolos se llenarán dinámicamente -->
-                </div>
-            </div>
-
-            <!-- Console Log -->
-            <div class="card">
-                <div class="card-header">
-                    <h2 class="card-title">
-                        <i class="fas fa-terminal"></i>
-                        Log del Sistema
-                    </h2>
-                    <button class="btn btn-primary" id="clear-log-btn" style="padding: 0.3rem 0.8rem; font-size: 0.8rem;">
-                        <i class="fas fa-eraser"></i>
-                        Limpiar
-                    </button>
-                </div>
-                
-                <div class="log-console" id="log-console">
-                    <div class="log-entry">
-                        <span class="log-timestamp">[00:00:00]</span>
-                        Sistema iniciado - Metodología Jaime Merino cargada
+                <div class="symbols-grid" id="symbols-container">
+                    <!-- Tarjetas de trading se generarán aquí -->
+                    {% for symbol, data in symbols_data.items() %}
+                    <div class="trading-card fade-in" id="card-{{ symbol }}">
+                        <div class="card-header">
+                            <div class="symbol-info">
+                                <div class="symbol-name">{{ symbol }}</div>
+                                <div class="symbol-price">${{ "%.2f"|format(data.current_price) }}</div>
+                            </div>
+                            <div class="signal-badges">
+                                <div class="signal-badge signal-{{ data.signal.signal.lower() }}">{{ data.signal.signal }}</div>
+                                <div class="strength-badge">{{ data.signal.signal_strength }}%</div>
+                            </div>
+                        </div>
+                        
+                        <!-- Sección de Futuros -->
+                        <div class="futures-section" id="futures-{{ symbol }}" style="display: none;">
+                            <div class="futures-header">
+                                <i class="fas fa-rocket"></i>
+                                Setup para Futuros - Metodología Merino
+                            </div>
+                            
+                            <div class="futures-grid">
+                                <!-- Columna Izquierda: Entrada y Targets -->
+                                <div class="futures-column">
+                                    <div class="level-group">
+                                        <div class="level-title">
+                                            <i class="fas fa-bullseye"></i>
+                                            Entrada
+                                        </div>
+                                        <div class="level-item">
+                                            <span class="level-label">Precio Óptimo:</span>
+                                            <span class="level-value price-entry" id="entry-optimal-{{ symbol }}">$0.00</span>
+                                        </div>
+                                        <div class="level-item">
+                                            <span class="level-label">Rango:</span>
+                                            <span class="level-value" id="entry-range-{{ symbol }}">$0.00 - $0.00</span>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="level-group">
+                                        <div class="level-title">
+                                            <i class="fas fa-trophy"></i>
+                                            Take Profit
+                                        </div>
+                                        <div id="targets-{{ symbol }}">
+                                            <!-- Targets se llenarán dinámicamente -->
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Columna Derecha: Stop Loss y Gestión -->
+                                <div class="futures-column">
+                                    <div class="level-group">
+                                        <div class="level-title">
+                                            <i class="fas fa-shield-alt"></i>
+                                            Stop Loss
+                                        </div>
+                                        <div class="level-item">
+                                            <span class="level-label">Stop Principal:</span>
+                                            <span class="level-value price-stop" id="stop-price-{{ symbol }}">$0.00</span>
+                                        </div>
+                                        <div class="level-item">
+                                            <span class="level-label">Porcentaje:</span>
+                                            <span class="percentage negative" id="stop-percentage-{{ symbol }}">-0.00%</span>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="level-group">
+                                        <div class="level-title">
+                                            <i class="fas fa-exclamation-triangle"></i>
+                                            Invalidación
+                                        </div>
+                                        <div class="level-item">
+                                            <span class="level-label">Nivel:</span>
+                                            <span class="level-value price-invalidation" id="invalidation-level-{{ symbol }}">$0.00</span>
+                                        </div>
+                                        <div style="font-size: 0.75rem; color: var(--warning); margin-top: 0.5rem;" id="invalidation-reason-{{ symbol }}">
+                                            Sin señal activa
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Gestión de Posición -->
+                            <div class="management-grid">
+                                <div class="management-item">
+                                    <div class="management-value" id="position-size-{{ symbol }}">0%</div>
+                                    <div class="management-label">Tamaño Posición</div>
+                                </div>
+                                <div class="management-item">
+                                    <div class="management-value" id="leverage-{{ symbol }}">1:1</div>
+                                    <div class="management-label">Apalancamiento</div>
+                                </div>
+                                <div class="management-item">
+                                    <div class="management-value" id="risk-reward-{{ symbol }}">1:0</div>
+                                    <div class="management-label">Risk/Reward</div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
+                    {% endfor %}
                 </div>
             </div>
         </div>
 
+        <!-- Sidebar -->
         <div class="sidebar">
-            <!-- Market Overview -->
-            <div class="market-overview">
-                <h3><i class="fas fa-globe"></i> Vista del Mercado</h3>
-                <div class="btc-price">
-                    <div class="price" id="btc-price">$0.00</div>
-                    <div class="change" id="btc-change">+0.00%</div>
+            <!-- Vista del Mercado -->
+            <div class="sidebar-card market-overview">
+                <div class="panel-title">
+                    <i class="fas fa-globe"></i>
+                    Vista del Mercado
                 </div>
+                <div class="btc-display">
+                    <div class="btc-price" id="btc-price">$0.00</div>
+                    <div class="btc-change" id="btc-change">+0.00%</div>
+                </div>
+                <div style="font-size: 0.8rem; color: var(--text-muted);">
+                    Última actualización: <span id="last-update">--:--</span>
+                </div>
+            </div>
+
+            <!-- Filosofía Merino -->
+            <div class="sidebar-card philosophy-card">
+                <div class="panel-title">
+                    <i class="fas fa-quote-left"></i>
+                    Filosofía Merino
+                </div>
+                <div class="philosophy-quote" id="philosophy-text">
+                    "El arte de tomar dinero de otros legalmente"
+                </div>
+                <div class="philosophy-author">- Jaime Merino, Trading Latino</div>
                 
-                <div class="stats-grid">
-                    <div class="stat-item">
-                        <div class="stat-number" id="high-probability-count">0</div>
-                        <div class="stat-label">Alta Probabilidad</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-number" id="total-symbols">0</div>
-                        <div class="stat-label">Símbolos Monitoreados</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-number" id="connected-clients">0</div>
-                        <div class="stat-label">Clientes Conectados</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-number" id="server-uptime">00:00</div>
-                        <div class="stat-label">Tiempo Activo</div>
+                <div style="margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid rgba(255, 215, 0, 0.3);">
+                    <div style="font-size: 0.85rem; color: var(--text-secondary); line-height: 1.4;">
+                        <div style="margin-bottom: 0.5rem;">📊 <strong>Filosofía 40-30-20-10</strong></div>
+                        <div style="font-size: 0.75rem; color: var(--text-muted);">
+                            40% BTC largo plazo • 30% Gráficos semanales<br>
+                            20% Trading diario • 10% Futuros
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Philosophy Card -->
-            <div class="card philosophy-card">
-                <div class="philosophy-text" id="philosophy-text">
-                    "Es mejor perder una oportunidad que perder dinero"
+            <!-- Estadísticas de Trading -->
+            <div class="sidebar-card">
+                <div class="panel-title">
+                    <i class="fas fa-chart-pie"></i>
+                    Estadísticas
                 </div>
-                <div class="philosophy-author">- Jaime Merino</div>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem;">
+                    <div class="stat-item">
+                        <div class="stat-value" style="color: var(--success);" id="win-rate">0%</div>
+                        <div class="stat-label">Win Rate</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" style="color: var(--accent-blue);" id="avg-rr">1:0</div>
+                        <div class="stat-label">Promedio R/R</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" style="color: var(--warning);" id="total-trades">0</div>
+                        <div class="stat-label">Trades Hoy</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" style="color: var(--accent-gold);" id="portfolio-value">$10,000</div>
+                        <div class="stat-label">Capital</div>
+                    </div>
+                </div>
+                
+                <div style="margin-top: 1.5rem; padding: 1rem; background: rgba(255, 215, 0, 0.1); border-radius: 8px; border: 1px solid rgba(255, 215, 0, 0.3);">
+                    <div style="font-size: 0.8rem; color: var(--accent-gold); font-weight: 600; margin-bottom: 0.5rem;">
+                        🛡️ Gestión de Riesgo Activa
+                    </div>
+                    <div style="font-size: 0.75rem; color: var(--text-secondary);">
+                        <div>Max pérdida diaria: <span style="color: var(--danger);">6%</span></div>
+                        <div>Max pérdida semanal: <span style="color: var(--danger);">8%</span></div>
+                        <div>Apalancamiento máximo: <span style="color: var(--warning);">1:3</span></div>
+                    </div>
+                </div>
             </div>
 
-            <!-- Risk Management -->
-            <div class="card risk-management">
-                <h3><i class="fas fa-shield-alt"></i> Gestión de Riesgo</h3>
-                <p style="margin-bottom: 1rem; font-size: 0.9rem;">
-                    Filosofía 40-30-20-10
-                </p>
-                
-                <div class="risk-allocation">
-                    <div class="allocation-item">
-                        <strong>40%</strong><br>
-                        BTC Largo Plazo
+            <!-- Console de Logs -->
+            <div class="sidebar-card console-card">
+                <div class="console-header">
+                    <div class="panel-title">
+                        <i class="fas fa-terminal"></i>
+                        Log del Sistema
                     </div>
-                    <div class="allocation-item">
-                        <strong>30%</strong><br>
-                        Gráficos Semanales
-                    </div>
-                    <div class="allocation-item">
-                        <strong>20%</strong><br>
-                        Trading Diario
-                    </div>
-                    <div class="allocation-item">
-                        <strong>10%</strong><br>
-                        Futuros
-                    </div>
+                    <button class="control-btn" id="clear-log-btn" style="padding: 0.3rem 0.6rem; font-size: 0.75rem; background: var(--bg-primary); border: 1px solid var(--border);">
+                        <i class="fas fa-trash"></i>
+                        Limpiar
+                    </button>
                 </div>
                 
-                <div style="margin-top: 1rem; font-size: 0.8rem; color: var(--text-secondary);">
-                    <i class="fas fa-exclamation-triangle"></i>
-                    Máximo 1% riesgo por operación
+                <div class="console-content" id="console-log">
+                    <div class="log-entry">
+                        <span class="log-timestamp">[--:--:--]</span>
+                        <span class="log-level-success">SISTEMA</span>
+                        <span>Jaime Merino Trading Bot iniciado</span>
+                    </div>
+                    <div class="log-entry">
+                        <span class="log-timestamp">[--:--:--]</span>
+                        <span class="log-level-info">INFO</span>
+                        <span>Metodología Trading Latino cargada</span>
+                    </div>
+                    <div class="log-entry">
+                        <span class="log-timestamp">[--:--:--]</span>
+                        <span class="log-level-info">WEBSOCKET</span>
+                        <span>Conectando al servidor...</span>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Notification Container -->
-    <div id="notification-container"></div>
-
-    <!-- Socket.IO and Custom JS -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <!-- Scripts JavaScript -->
     <script>
-        // Global variables
+        // Variables globales
         let socket;
-        let connected = false;
-        let symbolsData = {};
-        let startTime = Date.now();
-        let philosophyQuotes = [
+        let analysisData = {};
+        let lastPrices = {};
+        const philosophyQuotes = [
             "El arte de tomar dinero de otros legalmente",
-            "Es mejor perder una oportunidad que perder dinero",
-            "Solo operamos con alta probabilidad de éxito",
-            "Operamos contra el 90% que pierde dinero",
-            "Disciplina > Análisis técnico perfecto"
+            "Disciplina vence a emociones en el trading",
+            "Preserve capital, gestione riesgo, genere ganancias", 
+            "Solo opere con alta probabilidad de éxito",
+            "El mercado siempre tiene la razón",
+            "Paciencia es la virtud del trader exitoso"
         ];
-        let currentQuoteIndex = 0;
 
-        // Initialize application
+        // Inicialización
         document.addEventListener('DOMContentLoaded', function() {
             initializeSocket();
+            updateServerTime();
+            rotatePhilosophy();
+            setInterval(updateServerTime, 1000);
+            setInterval(rotatePhilosophy, 10000);
+            
+            // Event listeners para botones
             setupEventListeners();
-            startPhilosophyRotation();
-            startUptimeCounter();
+            
+            // Log inicial
+            addLogEntry('SISTEMA', 'Dashboard cargado correctamente', 'success');
         });
 
-        // Socket.IO initialization
+        // Configuración de WebSocket
         function initializeSocket() {
             socket = io();
             
             socket.on('connect', function() {
-                connected = true;
                 updateConnectionStatus(true);
-                logMessage('Conectado al servidor Jaime Merino', 'success');
+                addLogEntry('WEBSOCKET', 'Conectado al servidor', 'success');
+                
+                // Solicitar análisis inicial
+                socket.emit('request_all_symbols');
             });
 
             socket.on('disconnect', function() {
-                connected = false;
                 updateConnectionStatus(false);
-                logMessage('Desconectado del servidor', 'error');
-            });
-
-            socket.on('merino_welcome', function(data) {
-                logMessage(`Metodología cargada: ${data.methodology}`, 'info');
-                showNotification(data.msg, 'success');
-                document.getElementById('total-symbols').textContent = data.symbols_available.length;
+                addLogEntry('WEBSOCKET', 'Conexión perdida', 'error');
             });
 
             socket.on('merino_analysis_update', function(data) {
-                updateSymbolData(data.symbol, data.data);
-                if (data.high_probability) {
-                    showNotification(`🎯 ALTA PROBABILIDAD: ${data.symbol}`, 'warning');
-                    logMessage(`🎯 Señal alta probabilidad: ${data.symbol} - ${data.data.signal.signal} (${data.data.signal.signal_strength}%)`, 'success');
-                }
+                updateTradingCard(data.symbol, data.data);
+                addLogEntry('ANÁLISIS', `${data.symbol}: ${data.data.signal?.signal || 'UNKNOWN'}`, 'info');
             });
 
-            socket.on('btc_price_update', function(data) {
-                updateBTCPrice(data.price);
+            socket.on('analysis_error', function(data) {
+                addLogEntry('ERROR', `Error en análisis: ${data.error}`, 'error');
             });
 
-            socket.on('market_sentiment', function(data) {
-                logMessage(`Sentimiento de mercado: ${data.sentiment}`, 'info');
-            });
-
-            socket.on('merino_server_status', function(data) {
+            socket.on('server_status', function(data) {
                 updateServerStats(data);
-            });
-
-            socket.on('philosophy_reminder', function(data) {
-                showNotification(data.message, 'info');
-            });
-
-            socket.on('market_alert', function(data) {
-                showNotification(`🚨 ${data.message}`, 'warning');
-                logMessage(`Alerta: ${data.message}`, 'warning');
-            });
-
-            socket.on('merino_analysis_error', function(data) {
-                logMessage(`Error análisis ${data.symbol}: ${data.error}`, 'error');
             });
         }
 
-        // Event listeners setup
+        // Configurar event listeners
         function setupEventListeners() {
             document.getElementById('analyze-all-btn').addEventListener('click', function() {
-                socket.emit('request_all_merino_symbols');
-                this.innerHTML = '<span class="loading-spinner"></span> Analizando...';
+                socket.emit('request_all_symbols');
+                this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Analizando...';
                 setTimeout(() => {
                     this.innerHTML = '<i class="fas fa-chart-bar"></i> Analizar Todos';
                 }, 3000);
+                addLogEntry('USUARIO', 'Solicitud de análisis completo', 'info');
             });
 
             document.getElementById('btc-analysis-btn').addEventListener('click', function() {
-                socket.emit('request_merino_analysis', {symbol: 'BTCUSDT'});
-                showNotification('Solicitando análisis de Bitcoin...', 'info');
+                socket.emit('request_analysis', {symbol: 'BTCUSDT'});
+                this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Analizando BTC...';
+                setTimeout(() => {
+                    this.innerHTML = '<i class="fab fa-bitcoin"></i> Análisis BTC';
+                }, 2000);
+                addLogEntry('USUARIO', 'Análisis específico de BTCUSDT solicitado', 'info');
             });
 
             document.getElementById('philosophy-btn').addEventListener('click', function() {
-                socket.emit('request_merino_philosophy');
-                showNotification('Cargando filosofía de Jaime Merino...', 'info');
+                rotatePhilosophy();
+                addLogEntry('FILOSOFÍA', 'Recordatorio de metodología Merino', 'warning');
             });
 
-            document.getElementById('clear-cache-btn').addEventListener('click', function() {
-                symbolsData = {};
-                document.getElementById('symbols-container').innerHTML = '';
-                showNotification('Cache limpiado', 'success');
+            document.getElementById('refresh-btn').addEventListener('click', function() {
+                location.reload();
             });
 
             document.getElementById('clear-log-btn').addEventListener('click', function() {
-                document.getElementById('log-console').innerHTML = '';
+                document.getElementById('console-log').innerHTML = '';
+                addLogEntry('SISTEMA', 'Log limpiado', 'info');
             });
         }
 
-        // Update connection status
-        function updateConnectionStatus(isConnected) {
-            const statusDot = document.getElementById('connection-status');
-            const statusText = document.getElementById('connection-text');
-            
-            if (isConnected) {
-                statusDot.className = 'status-dot connected';
-                statusText.textContent = 'Conectado';
-            } else {
-                statusDot.className = 'status-dot disconnected';
-                statusText.textContent = 'Desconectado';
-            }
-        }
+        // Actualizar tarjeta de trading
+        function updateTradingCard(symbol, data) {
+            const card = document.getElementById(`card-${symbol}`);
+            if (!card) return;
 
-        // Update symbol data
-        function updateSymbolData(symbol, data) {
-            symbolsData[symbol] = data;
-            renderSymbolCard(symbol, data);
-            updateHighProbabilityCount();
-        }
-
-        // Render symbol card
-        function renderSymbolCard(symbol, data) {
-            const container = document.getElementById('symbols-container');
-            let card = document.getElementById(`symbol-${symbol}`);
-            
-            if (!card) {
-                card = document.createElement('div');
-                card.id = `symbol-${symbol}`;
-                card.className = 'symbol-card animate__animated animate__fadeInUp';
-                container.appendChild(card);
-            }
-
+            // Actualizar datos básicos
             const signal = data.signal || {};
             const currentPrice = data.current_price || 0;
-            const signalType = signal.signal || 'NO_SIGNAL';
-            const signalStrength = signal.signal_strength || 0;
-
-            card.innerHTML = `
-                <div class="symbol-header">
-                    <div class="symbol-name">${symbol}</div>
-                    <div class="signal-badge signal-${signalType.toLowerCase().replace('_', '-')}">${signalType}</div>
-                </div>
-                <div class="symbol-data">
-                    <div class="data-item">
-                        <div class="data-label">Precio</div>
-                        <div class="data-value">${currentPrice.toLocaleString()}</div>
-                    </div>
-                    <div class="data-item">
-                        <div class="data-label">Fuerza</div>
-                        <div class="data-value">${signalStrength}%</div>
-                    </div>
-                </div>
-                <div class="strength-bar">
-                    <div class="strength-fill" style="width: ${signalStrength}%; background: ${getStrengthColor(signalStrength)};"></div>
-                </div>
-                <div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.5rem;">
-                    Confluencias: ${signal.confluence_score || 0}/4
-                </div>
-            `;
-        }
-
-        // Get strength color
-        function getStrengthColor(strength) {
-            if (strength >= 70) return 'var(--success-color)';
-            if (strength >= 50) return 'var(--warning-color)';
-            return 'var(--danger-color)';
-        }
-
-        // Update BTC price
-        function updateBTCPrice(price) {
-            const priceElement = document.getElementById('btc-price');
-            const changeElement = document.getElementById('btc-change');
             
+            // Actualizar precio con animación si cambió
+            const priceElement = card.querySelector('.symbol-price');
             if (priceElement) {
-                const oldPrice = parseFloat(priceElement.textContent.replace(/[^0-9.]/g, ''));
-                priceElement.textContent = `${price.toLocaleString()}`;
+                const newPrice = currentPrice.toFixed(2);
+                const oldPrice = lastPrices[symbol] || 0;
                 
-                if (oldPrice && price !== oldPrice) {
-                    const change = ((price - oldPrice) / oldPrice) * 100;
-                    changeElement.textContent = `${change >= 0 ? '+' : ''}${change.toFixed(2)}%`;
-                    changeElement.className = `change ${change >= 0 ? 'positive' : 'negative'}`;
+                priceElement.textContent = `${newPrice}`;
+                
+                if (oldPrice && oldPrice !== currentPrice) {
+                    if (currentPrice > oldPrice) {
+                        priceElement.style.color = 'var(--success)';
+                    } else {
+                        priceElement.style.color = 'var(--danger)';
+                    }
+                    
+                    setTimeout(() => {
+                        priceElement.style.color = 'var(--accent-gold)';
+                    }, 2000);
                 }
+                
+                lastPrices[symbol] = currentPrice;
+            }
+
+            // Actualizar signal badge
+            const signalBadge = card.querySelector('.signal-badge');
+            if (signalBadge) {
+                const signalType = signal.signal || 'LOADING';
+                signalBadge.textContent = signalType;
+                signalBadge.className = `signal-badge signal-${signalType.toLowerCase()}`;
+            }
+
+            // Actualizar strength badge
+            const strengthBadge = card.querySelector('.strength-badge');
+            if (strengthBadge) {
+                const strength = signal.signal_strength || 0;
+                strengthBadge.textContent = `${strength}%`;
+                
+                // Cambiar color según fuerza
+                if (strength >= 80) {
+                    strengthBadge.style.borderColor = 'var(--success)';
+                    strengthBadge.style.color = 'var(--success)';
+                } else if (strength >= 60) {
+                    strengthBadge.style.borderColor = 'var(--warning)';
+                    strengthBadge.style.color = 'var(--warning)';
+                } else {
+                    strengthBadge.style.borderColor = 'var(--accent-gold)';
+                    strengthBadge.style.color = 'var(--accent-gold)';
+                }
+            }
+
+            // Actualizar sección de futuros
+            updateFuturesSection(symbol, data);
+            
+            // Resaltar tarjeta si es señal de alta probabilidad
+            if (signal.signal_strength >= 70) {
+                card.classList.add('highlight');
+                setTimeout(() => card.classList.remove('highlight'), 2000);
+            }
+            
+            // Guardar datos para estadísticas
+            analysisData[symbol] = data;
+            updateGlobalStats();
+        }
+
+        // Actualizar sección de futuros
+        function updateFuturesSection(symbol, data) {
+            const futuresSection = document.getElementById(`futures-${symbol}`);
+            const tradingLevels = data.trading_levels;
+            const signal = data.signal || {};
+
+            if (futuresSection && tradingLevels && signal.signal !== 'NO_SIGNAL' && signal.signal !== 'LOADING') {
+                futuresSection.style.display = 'block';
+
+                // Actualizar entrada
+                const entryOptimal = document.getElementById(`entry-optimal-${symbol}`);
+                const entryRange = document.getElementById(`entry-range-${symbol}`);
+
+                if (entryOptimal) entryOptimal.textContent = `${tradingLevels.entry_optimal?.toFixed(2) || '0.00'}`;
+                if (entryRange && tradingLevels.entry_range) {
+                    entryRange.textContent = `${tradingLevels.entry_range.low?.toFixed(2)} - ${tradingLevels.entry_range.high?.toFixed(2)}`;
+                }
+
+                // Actualizar targets
+                const targetsContainer = document.getElementById(`targets-${symbol}`);
+                if (targetsContainer && tradingLevels.targets) {
+                    targetsContainer.innerHTML = '';
+                    tradingLevels.targets.forEach((target, index) => {
+                        const targetDiv = document.createElement('div');
+                        targetDiv.className = 'target-item';
+                        targetDiv.innerHTML = `
+                            <div>
+                                <span style="font-weight: 600;">Target ${index + 1}:</span>
+                                <span class="level-value price-target">${target.level?.toFixed(2) || '0.00'}</span>
+                            </div>
+                            <div>
+                                <span class="percentage positive">+${target.percentage || 0}%</span>
+                            </div>
+                        `;
+                        targetsContainer.appendChild(targetDiv);
+                    });
+                }
+
+                // Actualizar stop loss
+                const stopPrice = document.getElementById(`stop-price-${symbol}`);
+                const stopPercentage = document.getElementById(`stop-percentage-${symbol}`);
+
+                if (stopPrice && tradingLevels.stop_loss) {
+                    stopPrice.textContent = `${tradingLevels.stop_loss.price?.toFixed(2) || '0.00'}`;
+                }
+                if (stopPercentage && tradingLevels.stop_loss) {
+                    stopPercentage.textContent = `-${tradingLevels.stop_loss.percentage?.toFixed(2) || '0.00'}%`;
+                }
+
+                // Actualizar gestión de posición
+                const positionSize = document.getElementById(`position-size-${symbol}`);
+                const leverage = document.getElementById(`leverage-${symbol}`);
+                const riskReward = document.getElementById(`risk-reward-${symbol}`);
+
+                if (positionSize) positionSize.textContent = `${tradingLevels.position_size_pct || 0}%`;
+                if (leverage && tradingLevels.leverage) {
+                    leverage.textContent = `1:${tradingLevels.leverage.recommended || 1}`;
+                }
+                if (riskReward) riskReward.textContent = `1:${tradingLevels.risk_reward || 0}`;
+
+                // Actualizar invalidación
+                const invalidationLevel = document.getElementById(`invalidation-level-${symbol}`);
+                const invalidationReason = document.getElementById(`invalidation-reason-${symbol}`);
+
+                if (invalidationLevel && tradingLevels.invalidation) {
+                    invalidationLevel.textContent = `${tradingLevels.invalidation.level?.toFixed(2) || '0.00'}`;
+                }
+                if (invalidationReason && tradingLevels.invalidation) {
+                    invalidationReason.textContent = tradingLevels.invalidation.reason || 'Sin información';
+                }
+
+            } else if (futuresSection) {
+                futuresSection.style.display = 'none';
             }
         }
 
-        // Update high probability count
-        function updateHighProbabilityCount() {
-            let count = 0;
-            Object.values(symbolsData).forEach(data => {
-                const strength = data.signal?.signal_strength || 0;
-                if (strength >= 50) count++;
+        // Actualizar estadísticas globales
+        function updateGlobalStats() {
+            const symbols = Object.keys(analysisData);
+            const analyzed = symbols.filter(s => analysisData[s].signal?.signal !== 'LOADING').length;
+            const highProb = symbols.filter(s => (analysisData[s].signal?.signal_strength || 0) >= 70).length;
+            const activeSignals = symbols.filter(s => ['LONG', 'SHORT'].includes(analysisData[s].signal?.signal)).length;
+
+            document.getElementById('symbols-analyzed').textContent = `${analyzed}/${symbols.length}`;
+            document.getElementById('active-signals').textContent = activeSignals;
+            document.getElementById('high-prob-signals').textContent = highProb;
+
+            // Actualizar precio de BTC si está disponible
+            if (analysisData.BTCUSDT && analysisData.BTCUSDT.current_price) {
+                document.getElementById('btc-price').textContent = `${analysisData.BTCUSDT.current_price.toLocaleString()}`;
+                
+                // Simular cambio porcentual (en producción, calcular real)
+                const change = (Math.random() - 0.5) * 10; // Simulado
+                const changeElement = document.getElementById('btc-change');
+                changeElement.textContent = `${change >= 0 ? '+' : ''}${change.toFixed(2)}%`;
+                changeElement.className = `btc-change ${change >= 0 ? 'positive' : 'negative'}`;
+            }
+        }
+
+        // Actualizar estado de conexión
+        function updateConnectionStatus(connected) {
+            const statusElements = document.querySelectorAll('#connection-status');
+            statusElements.forEach(element => {
+                const dot = element.querySelector('.status-dot');
+                const text = element.querySelector('span:last-child');
+                
+                if (connected) {
+                    dot.style.background = 'var(--success)';
+                    text.textContent = 'Conectado';
+                    element.style.background = 'rgba(16, 185, 129, 0.1)';
+                    element.style.borderColor = 'var(--success)';
+                } else {
+                    dot.style.background = 'var(--danger)';
+                    text.textContent = 'Desconectado';
+                    element.style.background = 'rgba(239, 68, 68, 0.1)';
+                    element.style.borderColor = 'var(--danger)';
+                }
             });
-            document.getElementById('high-probability-count').textContent = count;
         }
 
-        // Update server stats
-        function updateServerStats(data) {
-            document.getElementById('connected-clients').textContent = data.connected_clients || 0;
-            document.getElementById('high-probability-count').textContent = data.high_probability_signals || 0;
-            document.getElementById('total-symbols').textContent = data.supported_symbols?.length || 0;
-        }
-
-        // Log message
-        function logMessage(message, type = 'info') {
-            const console = document.getElementById('log-console');
-            const timestamp = new Date().toLocaleTimeString();
-            const icons = {
-                'success': '✅',
-                'error': '❌',
-                'warning': '⚠️',
-                'info': '📊'
-            };
+        // Actualizar hora del servidor
+        function updateServerTime() {
+            const now = new Date();
+            const timeString = now.toLocaleTimeString('es-ES', { 
+                hour12: false,
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
             
-            const logEntry = document.createElement('div');
-            logEntry.className = 'log-entry';
-            logEntry.innerHTML = `
+            const serverTimeElement = document.getElementById('server-time');
+            if (serverTimeElement) {
+                serverTimeElement.textContent = timeString;
+            }
+            
+            const lastUpdateElement = document.getElementById('last-update');
+            if (lastUpdateElement) {
+                lastUpdateElement.textContent = timeString;
+            }
+        }
+
+        // Rotar frases de filosofía
+        function rotatePhilosophy() {
+            const philosophyElement = document.getElementById('philosophy-text');
+            if (philosophyElement) {
+                const randomQuote = philosophyQuotes[Math.floor(Math.random() * philosophyQuotes.length)];
+                philosophyElement.style.opacity = '0';
+                
+                setTimeout(() => {
+                    philosophyElement.textContent = `"${randomQuote}"`;
+                    philosophyElement.style.opacity = '1';
+                }, 300);
+            }
+        }
+
+        // Agregar entrada al log
+        function addLogEntry(level, message, type = 'info') {
+            const console = document.getElementById('console-log');
+            const timestamp = new Date().toLocaleTimeString('es-ES', { hour12: false });
+            
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.innerHTML = `
                 <span class="log-timestamp">[${timestamp}]</span>
-                ${icons[type] || '📊'} ${message}
+                <span class="log-level-${type}">${level}</span>
+                <span>${message}</span>
             `;
             
-            console.appendChild(logEntry);
+            console.appendChild(entry);
             console.scrollTop = console.scrollHeight;
             
-            // Keep only last 100 entries
-            while (console.children.length > 100) {
+            // Limitar a 50 entradas
+            while (console.children.length > 50) {
                 console.removeChild(console.firstChild);
             }
         }
 
-        // Show notification
+        // Actualizar estadísticas del servidor
+        function updateServerStats(data) {
+            // Implementar cuando se reciban estadísticas del servidor
+            console.log('Server stats:', data);
+        }
+
+        // Función para mostrar notificaciones
         function showNotification(message, type = 'info') {
-            const container = document.getElementById('notification-container');
+            // Crear elemento de notificación
             const notification = document.createElement('div');
-            notification.className = `notification ${type}`;
-            notification.innerHTML = `
-                <i class="fas fa-${getNotificationIcon(type)}"></i>
-                ${message}
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: var(--bg-card);
+                border: 1px solid var(--border);
+                border-radius: 8px;
+                padding: 1rem;
+                max-width: 300px;
+                z-index: 1000;
+                box-shadow: var(--shadow);
+                animation: slideIn 0.3s ease;
             `;
             
-            container.appendChild(notification);
+            notification.innerHTML = `
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : 'info-circle'}" 
+                       style="color: var(--${type === 'success' ? 'success' : type === 'error' ? 'danger' : 'accent-blue'});"></i>
+                    <span style="color: var(--text-primary); font-size: 0.9rem;">${message}</span>
+                </div>
+            `;
             
-            // Show notification
-            setTimeout(() => {
-                notification.classList.add('show');
-            }, 100);
+            document.body.appendChild(notification);
             
-            // Hide and remove notification
+            // Remover después de 5 segundos
             setTimeout(() => {
-                notification.classList.remove('show');
-                setTimeout(() => {
-                    container.removeChild(notification);
-                }, 300);
-            }, 4000);
+                notification.remove();
+            }, 5000);
         }
 
-        // Get notification icon
-        function getNotificationIcon(type) {
-            const icons = {
-                'success': 'check-circle',
-                'error': 'exclamation-circle',
-                'warning': 'exclamation-triangle',
-                'info': 'info-circle'
-            };
-            return icons[type] || 'info-circle';
-        }
-
-        // Start philosophy rotation
-        function startPhilosophyRotation() {
-            setInterval(() => {
-                currentQuoteIndex = (currentQuoteIndex + 1) % philosophyQuotes.length;
-                const philosophyElement = document.getElementById('philosophy-text');
-                philosophyElement.style.opacity = '0';
-                
-                setTimeout(() => {
-                    philosophyElement.textContent = `"${philosophyQuotes[currentQuoteIndex]}"`;
-                    philosophyElement.style.opacity = '1';
-                }, 300);
-            }, 8000);
-        }
-
-        // Start uptime counter
-        function startUptimeCounter() {
-            setInterval(() => {
-                const uptime = Date.now() - startTime;
-                const hours = Math.floor(uptime / (1000 * 60 * 60));
-                const minutes = Math.floor((uptime % (1000 * 60 * 60)) / (1000 * 60));
-                document.getElementById('server-uptime').textContent = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
-            }, 60000);
-        }
-
-        // Request server status periodically
-        setInterval(() => {
-            if (connected) {
-                socket.emit('get_merino_server_status');
+        // Estilos para animaciones
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes slideIn {
+                from { transform: translateX(100%); opacity: 0; }
+                to { transform: translateX(0); opacity: 1; }
             }
-        }, 30000);
-
-        // Initial server status request
-        setTimeout(() => {
-            if (connected) {
-                socket.emit('get_merino_server_status');
+            
+            .trading-card {
+                transition: all 0.3s ease;
             }
-        }, 2000);
+            
+            .philosophy-quote {
+                transition: opacity 0.3s ease;
+            }
+        `;
+        document.head.appendChild(style);
     </script>
 </body>
 </html>

@@ -99,9 +99,48 @@ def register_merino_routes(app, config):
     def index():
         """Dashboard principal del Jaime Merino Bot"""
         try:
-            return render_template('merino_dashboard.html', 
-                                 config=config,
-                                 methodology=merino_methodology)
+            # ✅ PASAR DATOS CORRECTOS AL TEMPLATE
+            template_data = {
+                'config': {
+                    'TRADING_SYMBOLS': ['BTCUSDT', 'ETHUSDT'],  # O tu lista actual
+                    'HOST': '0.0.0.0',
+                    'PORT': 5000,
+                    'DEBUG': True
+                },
+                'methodology': {
+                    'PHILOSOPHY': {
+                        'main_principle': 'El arte de tomar dinero de otros legalmente',
+                        'discipline': 'Disciplina > Emociones',
+                        'risk_motto': 'Preserve capital - Manage risk'
+                    }
+                },
+                # ✅ DATOS INICIALES PARA LAS TARJETAS
+                'symbols_data': {
+                    'BTCUSDT': {
+                        'symbol': 'BTCUSDT',
+                        'current_price': 0.0,
+                        'signal': {
+                            'signal': 'LOADING',
+                            'signal_strength': 0,
+                            'bias': 'NEUTRAL'
+                        },
+                        'trading_levels': None
+                    },
+                    'ETHUSDT': {
+                        'symbol': 'ETHUSDT', 
+                        'current_price': 0.0,
+                        'signal': {
+                            'signal': 'LOADING',
+                            'signal_strength': 0,
+                            'bias': 'NEUTRAL'
+                        },
+                        'trading_levels': None
+                    }
+                }
+            }
+            
+            return render_template('merino_dashboard.html', **template_data)
+            
         except Exception as e:
             logger.error(f"❌ Error sirviendo dashboard: {e}")
             return f"Error cargando dashboard: {str(e)}", 500
@@ -499,16 +538,19 @@ def perform_initial_merino_analysis(socket_handlers, config):
 def main():
     """Función principal para ejecutar el Jaime Merino Trading Bot"""
     try:
-        print("=" * 80)
-        print("🚀 JAIME MERINO TRADING BOT")
-        print("📈 Metodología Trading Latino - Análisis Técnico Avanzado")
-        print("=" * 80)
+        # Configuración mejorada para producción
+        port = int(os.environ.get('PORT', 5000))
+        host = os.environ.get('HOST', '0.0.0.0')
+        debug = os.environ.get('DEBUG', 'False').lower() == 'true'
         
-        # Banner con filosofía de Merino
-        print(f"💡 Filosofía: {merino_methodology.PHILOSOPHY['main_principle']}")
-        print(f"🎯 Principio: {merino_methodology.PHILOSOPHY['discipline']}")
-        print(f"⚠️ Riesgo: {merino_methodology.PHILOSOPHY['risk_motto']}")
+        logger.info("🎯 ¡Jaime Merino Trading Bot iniciado!")
+        logger.info(f"📈 Metodología: {merino_methodology.PHILOSOPHY['main_principle']}")
         print("=" * 80)
+        print(f"🌐 Servidor Merino disponible en: http://{host}:{port}")
+        print(f"📱 Dashboard: http://localhost:{port}")
+        print(f"🧠 Filosofía: {merino_methodology.PHILOSOPHY['discipline']}")
+        print("=" * 80)
+        print("🎯 ¡Jaime Merino Trading Bot iniciado!")
         
         # Mostrar configuración
         config_name = os.environ.get('FLASK_ENV', 'development')
@@ -580,4 +622,42 @@ def main():
         logger.info("👋 Jaime Merino Trading Bot finalizado")
 
 if __name__ == '__main__':
-    main()
+    try:
+        # Configuración mejorada para producción
+        port = int(os.environ.get('PORT', 5000))
+        host = os.environ.get('HOST', '0.0.0.0')
+        debug = os.environ.get('DEBUG', 'False').lower() == 'true'
+        
+        logger.info("🎯 ¡Jaime Merino Trading Bot iniciado!")
+        logger.info(f"📈 Metodología: {merino_methodology.PHILOSOPHY['main_principle']}")
+        print("=" * 80)
+        print(f"🌐 Servidor Merino disponible en: http://{host}:{port}")
+        print(f"📱 Dashboard: http://localhost:{port}")
+        print(f"🧠 Filosofía: {merino_methodology.PHILOSOPHY['discipline']}")
+        print("=" * 80)
+        print("🎯 ¡Jaime Merino Trading Bot iniciado!")
+        
+        # Verificar conexión a Binance
+        logger.info("🔍 Verificando conexión a Binance...")
+        if binance_service.test_connection():
+            logger.info("✅ Conexión a Binance exitosa")
+        else:
+            logger.warning("⚠️ Conexión a Binance falló - usando modo demo")
+        
+        # Crear aplicación
+        app, socketio, socket_handlers = create_merino_app()
+        
+        # ✅ CONFIGURACIÓN PARA RENDER
+        socketio.run(
+            app, 
+            host=host, 
+            port=port, 
+            debug=debug,
+            use_reloader=False,  # Importante para producción
+            log_output=True
+        )
+        
+    except Exception as e:
+        logger.error(f"❌ Error crítico al iniciar Jaime Merino Bot: {e}")
+        import traceback
+        traceback.print_exc()

@@ -5,7 +5,7 @@ import pandas as pd  # ← NUEVO
 from datetime import datetime
 from typing import Optional, Dict
 from services.binance_service import binance_service
-# from services.enhanced_indicators import jaime_merino_signal_generator  # ← COMENTADA
+from services.enhanced_indicators import jaime_merino_signal_generator  # ← COMENTADA
 from models.trading_analysis import TradingAnalysis, create_analysis
 from utils.logger import analysis_logger
 from enhanced_config import MerinoConfig  # ← También cambiar esto si está usando Config
@@ -20,18 +20,14 @@ class EnhancedAnalysisService:
     def __init__(self):
         """Inicializa el servicio de análisis mejorado"""
         self.binance = binance_service
-        #self.merino_generator = jaime_merino_signal_generator
+        self.merino_generator = jaime_merino_signal_generator
         logger.info("🚀 Servicio de análisis mejorado inicializado - Metodología Jaime Merino")
     
+    # services/enhanced_analysis_service.py
+
     def analyze_symbol_merino(self, symbol: str) -> Optional[Dict]:
         """
         Realiza análisis completo siguiendo la metodología de Jaime Merino
-        
-        Args:
-            symbol: Símbolo a analizar (ej: 'BTCUSDT')
-            
-        Returns:
-            Análisis completo según metodología Merino
         """
         try:
             logger.info(f"📊 Iniciando análisis Merino para {symbol}")
@@ -41,7 +37,7 @@ class EnhancedAnalysisService:
             df_1h = self.binance.get_klines(symbol, interval='1h', limit=50)
             df_daily = self.binance.get_klines(symbol, interval='1d', limit=30)
             
-            if any(df is None or len(df) < 55 for df in [df_4h, df_1h]):
+            if any(df is None or len(df) < 20 for df in [df_4h, df_1h]):
                 logger.error(f"❌ Insuficientes datos históricos para {symbol}")
                 return None
             
@@ -56,48 +52,53 @@ class EnhancedAnalysisService:
                 df_4h, df_1h, current_price
             )
             
-            # 4. Análisis de contexto de mercado
-            market_context = self._analyze_market_context(df_daily, current_price)
+            # 4. Análisis básico de contexto
+            market_context = {
+                'macro_trend': 'NEUTRAL',
+                'ema_11_daily': float(current_price),
+                'ema_55_daily': float(current_price),
+                'volatility_pct': 2.0
+            }
             
-            # 5. Gestión de capital según filosofía 40-30-20-10
-            capital_allocation = self._calculate_capital_allocation(
-                merino_signal['signal'], merino_signal['signal_strength']
-            )
+            # 5. Gestión básica de capital
+            capital_allocation = {
+                'current_trade': {
+                    'position_size': 2.0 if merino_signal['signal'] in ['LONG', 'SHORT'] else 0.0,
+                    'max_risk_per_trade': 2.0
+                },
+                'philosophy': '40-30-20-10'
+            }
             
-            # 6. Generar análisis textual detallado
-            analysis_text = self._generate_merino_analysis_text(
-                symbol, current_price, merino_signal, market_context
-            )
+            # 6. Análisis textual
+            analysis_text = f"Análisis Merino para {symbol}: {merino_signal['signal']} ({merino_signal['signal_strength']}%)"
             
-            # 7. Generar recomendación específica
-            recommendation = self._generate_merino_recommendation(
-                symbol, current_price, merino_signal, capital_allocation
-            )
-            
-            # 8. Compilar resultado final
-            analysis_result = {
+            # 7. Crear estructura compatible con el sistema de caché
+            result = {
                 'symbol': symbol,
                 'timestamp': datetime.now().isoformat(),
-                'current_price': current_price,
-                'methodology': 'JAIME_MERINO',
                 'signal': merino_signal,
                 'market_context': market_context,
                 'capital_allocation': capital_allocation,
                 'analysis_text': analysis_text,
-                'recommendation': recommendation,
-                'risk_management': self._get_risk_management_rules(),
-                'confluence_analysis': self._analyze_confluence(merino_signal)
+                'current_price': float(current_price),
+                
+                # ✅ AGREGAR CAMPOS COMPATIBLES CON EL CACHE:
+                'signal_type': merino_signal['signal'],
+                'signal_strength': merino_signal['signal_strength'],
+                'bias': merino_signal['bias'],
+                'confluence_score': merino_signal['confluence_score'],
+                'trading_levels': merino_signal['trading_levels'],
+                
+                # Para compatibilidad con sistema antiguo
+                'to_dict': lambda: result  # Método falso para compatibilidad
             }
             
             logger.info(f"✅ Análisis Merino completado para {symbol}: {merino_signal['signal']} ({merino_signal['signal_strength']}%)")
-            return analysis_result
+            return result
             
         except Exception as e:
             logger.error(f"❌ Error en análisis Merino de {symbol}: {e}")
-            import traceback
-            logger.error(traceback.format_exc())
             return None
-    
     def _analyze_market_context(self, df_daily: pd.DataFrame, current_price: float) -> Dict:
         """
         Analiza el contexto general del mercado en timeframe diario

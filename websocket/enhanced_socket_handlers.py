@@ -10,6 +10,7 @@ from enhanced_config import merino_methodology
 import threading
 import time
 import json
+from datetime import datetime
 
 logger = websocket_logger
 
@@ -461,30 +462,37 @@ class EnhancedSocketHandlers:
         except Exception as e:
             logger.error(f"❌ Error enviando market overview: {e}")
     
-    def _clean_merino_analysis(self, analysis: dict) -> dict:
+    def _clean_merino_analysis(self, analysis_data: dict) -> dict:
         """
-        Limpia análisis Merino para serialización JSON
+        Limpia los datos de análisis para el caché
         
         Args:
-            analysis: Análisis a limpiar
+            analysis_data: Datos del análisis
             
         Returns:
-            Análisis limpio
+            Datos limpios para cachear
         """
         try:
-            # Usar utilidad existente y agregar campos específicos de Merino
-            cleaned = clean_analysis_dict(analysis.copy())
+            # Asegurar que todos los valores sean serializables
+            clean_data = {}
             
-            # Agregar metadatos de Merino
-            cleaned['methodology'] = 'JAIME_MERINO'
-            cleaned['philosophy_applied'] = True
-            cleaned['version'] = '2.0.0'
+            for key, value in analysis_data.items():
+                if key == 'timestamp' and isinstance(value, datetime):
+                    clean_data[key] = value.isoformat()
+                elif key == 'to_dict':
+                    # Omitir el método falso
+                    continue
+                elif isinstance(value, (dict, list, str, int, float, bool, type(None))):
+                    clean_data[key] = value
+                else:
+                    # Convertir otros tipos a string
+                    clean_data[key] = str(value)
             
-            return cleaned
+            return clean_data
             
         except Exception as e:
-            logger.error(f"❌ Error limpiando análisis Merino: {e}")
-            return {'error': 'Análisis no serializable', 'methodology': 'JAIME_MERINO'}
+            logger.error(f"❌ Error limpiando datos de análisis: {e}")
+            return analysis_data
     
     def _calculate_merino_risk(self, capital: float, signal_strength: int, symbol: str) -> dict:
         """
@@ -634,27 +642,46 @@ class EnhancedSocketHandlers:
         except Exception as e:
             logger.error(f"❌ Error en broadcast Merino para {symbol}: {e}")
     
-    def cache_merino_analysis(self, symbol: str, analysis_data: dict):
+    def cache_merino_analysis(self, symbol: str, analysis_data):
         """
-        Cachea análisis Merino
+        Cachea análisis Merino con mejor manejo de tipos
         
         Args:
             symbol: Símbolo
-            analysis_data: Datos del análisis
+            analysis_data: Datos del análisis (puede ser dict o string)
         """
         try:
-            clean_data = self._clean_merino_analysis(analysis_data.copy())
-            self.merino_analysis_cache[symbol] = clean_data
+            # Verificar si analysis_data es un diccionario válido
+            if isinstance(analysis_data, dict):
+                clean_data = self._clean_merino_analysis(analysis_data.copy())
+                self.merino_analysis_cache[symbol] = clean_data
+                
+                signal_strength = clean_data.get('signal', {}).get('signal_strength', 0)
+                if signal_strength >= 50:  # Usar threshold fijo si no hay config
+                    logger.info(f"💾🎯 Análisis alta probabilidad cacheado: {symbol} ({signal_strength}%)")
+                else:
+                    logger.debug(f"💾 Análisis Merino cacheado: {symbol} ({signal_strength}%)")
             
-            signal_strength = clean_data.get('signal', {}).get('signal_strength', 0)
-            if signal_strength >= self.config.SIGNALS['min_strength_for_trade']:
-                logger.info(f"💾🎯 Análisis alta probabilidad cacheado: {symbol} ({signal_strength}%)")
+            elif isinstance(analysis_data, str):
+                # Si es string, crear estructura básica
+                logger.warning(f"⚠️ Análisis recibido como string para {symbol}, creando estructura básica")
+                basic_structure = {
+                    'symbol': symbol,
+                    'analysis_text': analysis_data,
+                    'timestamp': time.time(),
+                    'signal': {
+                        'signal': 'UNKNOWN',
+                        'signal_strength': 0,
+                        'bias': 'NEUTRAL'
+                    }
+                }
+                self.merino_analysis_cache[symbol] = basic_structure
+                
             else:
-                logger.debug(f"💾 Análisis Merino cacheado: {symbol} ({signal_strength}%)")
+                logger.error(f"❌ Tipo de datos inválido para caché de {symbol}: {type(analysis_data)}")
                 
         except Exception as e:
             logger.error(f"❌ Error cacheando análisis Merino para {symbol}: {e}")
-    
     def clear_merino_analysis_cache(self):
         """Limpia el cache de análisis Merino"""
         cache_size = len(self.merino_analysis_cache)

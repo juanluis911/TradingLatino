@@ -28,12 +28,6 @@ class MerinoConfig:
         'ETHUSDT',    # Ethereum
         'ADAUSDT',    # Cardano
         'BNBUSDT',    # Binance Coin
-        'SOLUSDT',    # Solana
-        'XRPUSDT',    # Ripple
-        'DOTUSDT',    # Polkadot
-        'LINKUSDT',   # Chainlink
-        'AVAXUSDT',   # Avalanche
-        'MATICUSDT'   # Polygon
     ]
     
     # Configuración de timeframes (metodología multi-temporal de Merino)
@@ -162,15 +156,37 @@ class MerinoConfig:
         'commission_pct': float(os.environ.get('BACKTEST_COMMISSION', 0.1))
     }
 
+    @staticmethod
+    def get_socketio_config():
+        """Configuración específica para SocketIO en producción"""
+        return {
+            'cors_allowed_origins': os.environ.get('CORS_ORIGINS', '*'),
+            'async_mode': 'eventlet',
+            'logger': False,
+            'engineio_logger': False,
+            'ping_timeout': 60,
+            'ping_interval': 25
+        }
 class ProductionMerinoConfig(MerinoConfig):
-    """Configuración para producción"""
+    """Configuración para producción en Render"""
     DEBUG = False
-    LOG_LEVEL = 'WARNING'
+    LOG_LEVEL = 'INFO'
+    
+    # URLs permitidas para CORS
+    SOCKETIO_CORS_ALLOWED_ORIGINS = [
+        "https://*.onrender.com",
+        "https://your-app-name.onrender.com"  # Reemplaza con tu URL
+    ]
+    
+    # Configuración optimizada para Render
+    SOCKETIO_ASYNC_MODE = 'eventlet'
+    
+    # Timeouts más largos para conexiones remotas
     UPDATE_INTERVALS = {
-        '4h': 1800,  # 30 minutos en producción
+        '4h': 1800,  # 30 minutos
         '1h': 600,   # 10 minutos
-        '1d': 7200,  # 2 horas
-        'realtime': 120  # 2 minutos
+        '1d': 3600,  # 1 hora
+        'realtime': 300  # 5 minutos
     }
 
 class DevelopmentMerinoConfig(MerinoConfig):
