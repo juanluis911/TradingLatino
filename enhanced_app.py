@@ -242,27 +242,15 @@ def generate_trading_data():
     global last_prices
     
     # Obtener precios reales como referencia
-    real_prices = get_real_price_reference()
+    real_prices = get_real_prices()
     
     data = {}
-    
     for symbol in SYMBOLS:
-        base_price = real_prices.get(symbol, BASE_PRICES[symbol])
+        current_price = real_prices[symbol]
         
-        # Variación suave si tenemos precio anterior
-        if symbol in last_prices:
-            change_factor = random.uniform(-0.005, 0.005)  # ±0.5%
-            current_price = last_prices[symbol] * (1 + change_factor)
-        else:
-            change_factor = random.uniform(-0.02, 0.02)  # ±2%
-            current_price = base_price * (1 + change_factor)
-        
-        # Generar análisis completo
+        # ✅ Usar precio real, no simulado
         analysis = generate_enhanced_analysis(symbol, current_price)
-        
-        # Almacenar precio para próxima iteración
         last_prices[symbol] = current_price
-        
         data[symbol] = analysis
     
     return data
