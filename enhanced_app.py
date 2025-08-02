@@ -1,663 +1,421 @@
 """
-Aplicación principal mejorada - Bot de Trading Jaime Merino
-Implementa la metodología completa de Trading Latino
+🚀 Jaime Merino Trading Bot - Enhanced Version for Render
+📈 Metodología Trading Latino Avanzada
 """
+
 import os
+import sys
 import threading
 import time
+import logging
 from datetime import datetime
 from flask import Flask, render_template, jsonify, request
 from flask_socketio import SocketIO, emit
-from enhanced_config import merino_config, MerinoConfig, merino_methodology
-from utils.logger import setup_logger, app_logger
-from websocket.enhanced_socket_handlers import EnhancedSocketHandlers
-from services.enhanced_analysis_service import enhanced_analysis_service
-from services.binance_service import binance_service
+from flask_cors import CORS
 
-# Configurar logging mejorado
-logger = app_logger
+# Configuración básica de logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-def create_merino_app(config_name=None):
-    """
-    Factory function para crear la aplicación Jaime Merino Bot
+# Configuración de la aplicación para Render
+class RenderConfig:
+    """Configuración optimizada para Render"""
+    SECRET_KEY = os.environ.get('SECRET_KEY', 'jaime-merino-enhanced-2024')
+    DEBUG = False
     
-    Args:
-        config_name: Nombre de la configuración a usar
-        
-    Returns:
-        Tupla (app, socketio, socket_handlers)
-    """
-    # Determinar configuración
-    if config_name is None:
-        config_name = os.environ.get('FLASK_ENV', 'development')
+    # Configuración específica para Render
+    PORT = int(os.environ.get('PORT', 5000))
+    HOST = '0.0.0.0'
     
-    # Crear aplicación Flask
-    app = Flask(__name__)
-    config_class = merino_config.get(config_name, merino_config['default'])
-    app.config.from_object(config_class)
+    # Configuración de CORS para Render
+    CORS_ORIGINS = ["*"]  # En producción, especifica tu dominio
     
-    # Configurar logging específico
-    setup_merino_logging(config_class.LOG_LEVEL)
+    # Símbolos de trading
+    TRADING_SYMBOLS = [
+        'BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'ADAUSDT', 'XRPUSDT',
+        'SOLUSDT', 'DOTUSDT', 'DOGEUSDT', 'AVAXUSDT', 'MATICUSDT'
+    ]
     
-    # Inicializar SocketIO
-    socketio = SocketIO(
-        app,
-        cors_allowed_origins=app.config['SOCKETIO_CORS_ALLOWED_ORIGINS'],
-        async_mode=app.config['SOCKETIO_ASYNC_MODE'],
-        logger=False,
-        engineio_logger=False
-    )
-    
-    # Configurar handlers mejorados de Socket.IO
-    socket_handlers = EnhancedSocketHandlers(socketio, config_class)
-    socket_handlers.register_handlers()
-    
-    # Registrar rutas mejoradas
-    register_merino_routes(app, config_class)
-    
-    # Configurar servicios de fondo mejorados
-    setup_merino_background_services(socketio, socket_handlers, config_class)
-    
-    logger.info("🚀 Jaime Merino Trading Bot creado exitosamente")
-    logger.info(f"📈 Metodología: {merino_methodology.PHILOSOPHY['main_principle']}")
-    
-    return app, socketio, socket_handlers
+    # Intervalos de actualización (optimizados para Render Free Plan)
+    UPDATE_INTERVALS = {
+        '4h': 1800,    # 30 minutos
+        '1h': 900,     # 15 minutos
+        '1d': 3600,    # 1 hora
+        'realtime': 300  # 5 minutos
+    }
 
-def setup_merino_logging(log_level: str):
+# Crear aplicación Flask
+app = Flask(__name__)
+app.config.from_object(RenderConfig)
+
+# Configurar CORS
+CORS(app, origins=app.config['CORS_ORIGINS'])
+
+# Configurar SocketIO para Render
+socketio = SocketIO(
+    app,
+    cors_allowed_origins="*",
+    async_mode='eventlet',
+    logger=False,
+    engineio_logger=False,
+    ping_timeout=60,
+    ping_interval=25
+)
+
+# Variables globales para datos
+trading_data = {}
+analysis_active = False
+
+def mock_market_data():
     """
-    Configura logging específico para la metodología Merino
-    
-    Args:
-        log_level: Nivel de logging
+    Genera datos de mercado simulados para demostración
+    (Reemplazar con datos reales de Binance cuando se configuren las APIs)
     """
-    # Crear directorio de logs si no existe
-    os.makedirs('logs', exist_ok=True)
+    import random
+    import time
     
-    # Configurar loggers específicos
-    loggers = {
-        'merino_app': MerinoConfig.LOG_FILES['app'],
-        'merino_analysis': MerinoConfig.LOG_FILES['analysis'],
-        'merino_signals': MerinoConfig.LOG_FILES['signals'],
-        'merino_trades': MerinoConfig.LOG_FILES['trades'],
-        'merino_websocket': MerinoConfig.LOG_FILES['websocket'],
-        'merino_binance': MerinoConfig.LOG_FILES['binance']
+    symbols = app.config['TRADING_SYMBOLS']
+    base_prices = {
+        'BTCUSDT': 45000,
+        'ETHUSDT': 3000,
+        'BNBUSDT': 300,
+        'ADAUSDT': 0.50,
+        'XRPUSDT': 0.60,
+        'SOLUSDT': 100,
+        'DOTUSDT': 7,
+        'DOGEUSDT': 0.08,
+        'AVAXUSDT': 40,
+        'MATICUSDT': 1.0
     }
     
-    for logger_name, log_file in loggers.items():
-        setup_logger(logger_name, log_file, log_level)
-
-def register_merino_routes(app, config):
-    """
-    Registra las rutas mejoradas de la aplicación
-    
-    Args:
-        app: Instancia de Flask
-        config: Configuración de la app
-    """
-    
-    @app.route('/')
-    def index():
-        """Dashboard principal del Jaime Merino Bot"""
-        try:
-            # ✅ PASAR DATOS CORRECTOS AL TEMPLATE
-            template_data = {
-                'config': {
-                    'TRADING_SYMBOLS': ['BTCUSDT', 'ETHUSDT'],  # O tu lista actual
-                    'HOST': '0.0.0.0',
-                    'PORT': 5000,
-                    'DEBUG': True
-                },
-                'methodology': {
-                    'PHILOSOPHY': {
-                        'main_principle': 'El arte de tomar dinero de otros legalmente',
-                        'discipline': 'Disciplina > Emociones',
-                        'risk_motto': 'Preserve capital - Manage risk'
-                    }
-                },
-                # ✅ DATOS INICIALES PARA LAS TARJETAS
-                'symbols_data': {
-                    'BTCUSDT': {
-                        'symbol': 'BTCUSDT',
-                        'current_price': 0.0,
-                        'signal': {
-                            'signal': 'LOADING',
-                            'signal_strength': 0,
-                            'bias': 'NEUTRAL'
-                        },
-                        'trading_levels': None
-                    },
-                    'ETHUSDT': {
-                        'symbol': 'ETHUSDT', 
-                        'current_price': 0.0,
-                        'signal': {
-                            'signal': 'LOADING',
-                            'signal_strength': 0,
-                            'bias': 'NEUTRAL'
-                        },
-                        'trading_levels': None
-                    }
-                }
-            }
-            
-            return render_template('merino_dashboard.html', **template_data)
-            
-        except Exception as e:
-            logger.error(f"❌ Error sirviendo dashboard: {e}")
-            return f"Error cargando dashboard: {str(e)}", 500
-    
-    @app.route('/health')
-    def health_check():
-        """Endpoint de salud mejorado"""
-        try:
-            # Verificar conexión a Binance
-            binance_status = binance_service.test_connection()
-            
-            # Verificar servicios internos
-            analysis_status = enhanced_analysis_service is not None
-            
-            health_data = {
-                'status': 'healthy' if binance_status and analysis_status else 'degraded',
-                'timestamp': datetime.now().isoformat(),
-                'methodology': 'JAIME_MERINO',
-                'version': '2.0.0',
-                'services': {
-                    'binance': 'connected' if binance_status else 'disconnected',
-                    'analysis_service': 'active' if analysis_status else 'inactive',
-                    'websocket': 'active',
-                    'enhanced_indicators': 'active'
-                },
-                'configuration': {
-                    'symbols': config.TRADING_SYMBOLS,
-                    'timeframes': config.TIMEFRAMES,
-                    'update_intervals': config.UPDATE_INTERVALS,
-                    'risk_management': config.RISK_MANAGEMENT,
-                    'signals_config': config.SIGNALS
-                },
-                'philosophy': merino_methodology.PHILOSOPHY['main_principle']
-            }
-            
-            return jsonify(health_data)
-            
-        except Exception as e:
-            logger.error(f"❌ Error en health check: {e}")
-            return jsonify({
-                'status': 'unhealthy',
-                'error': str(e),
-                'timestamp': datetime.now().isoformat(),
-                'methodology': 'JAIME_MERINO'
-            }), 500
-    
-    @app.route('/api/merino/symbols')
-    def get_merino_symbols():
-        """API endpoint para obtener símbolos según Merino"""
-        return jsonify({
-            'symbols': config.TRADING_SYMBOLS,
-            'count': len(config.TRADING_SYMBOLS),
-            'timeframes': config.TIMEFRAMES,
-            'methodology': 'JAIME_MERINO',
-            'focus': 'Bitcoin y principales altcoins según Trading Latino'
-        })
-    
-    @app.route('/api/merino/analysis/<symbol>')
-    def get_merino_analysis(symbol):
-        """
-        API endpoint para obtener análisis según metodología Merino
+    data = {}
+    for symbol in symbols:
+        base_price = base_prices.get(symbol, 100)
+        current_price = base_price * (1 + random.uniform(-0.05, 0.05))
         
-        Args:
-            symbol: Símbolo a analizar
-        """
-        try:
-            symbol = symbol.upper()
+        data[symbol] = {
+            'symbol': symbol,
+            'price': round(current_price, 6),
+            'change_24h': round(random.uniform(-10, 10), 2),
+            'volume': random.randint(1000000, 100000000),
+            'timestamp': int(time.time()),
             
-            if symbol not in config.TRADING_SYMBOLS:
-                return jsonify({
-                    'success': False,
-                    'error': f'Símbolo {symbol} no está en la metodología Merino',
-                    'supported_symbols': config.TRADING_SYMBOLS,
-                    'methodology': 'JAIME_MERINO'
-                }), 400
+            # Indicadores técnicos simulados
+            'indicators': {
+                'rsi': round(random.uniform(20, 80), 2),
+                'macd': round(random.uniform(-1, 1), 4),
+                'ema_20': round(current_price * 0.98, 6),
+                'ema_50': round(current_price * 0.95, 6),
+                'bollinger_upper': round(current_price * 1.02, 6),
+                'bollinger_lower': round(current_price * 0.98, 6),
+                'adx': round(random.uniform(20, 60), 2)
+            },
             
-            # Realizar análisis completo según Merino
-            analysis = enhanced_analysis_service.analyze_symbol_merino(symbol)
-            
-            if analysis:
-                return jsonify({
-                    'success': True,
-                    'methodology': 'JAIME_MERINO',
-                    'symbol': symbol,
-                    'data': analysis,
-                    'timestamp': datetime.now().isoformat(),
-                    'philosophy': merino_methodology.PHILOSOPHY['discipline']
-                })
-            else:
-                return jsonify({
-                    'success': False,
-                    'methodology': 'JAIME_MERINO',
-                    'symbol': symbol,
-                    'error': 'No se pudo completar el análisis según metodología Merino',
-                    'timestamp': datetime.now().isoformat()
-                }), 500
-                
-        except Exception as e:
-            logger.error(f"❌ Error en API análisis Merino para {symbol}: {e}")
-            return jsonify({
-                'success': False,
-                'methodology': 'JAIME_MERINO',
-                'symbol': symbol,
-                'error': str(e),
-                'timestamp': datetime.now().isoformat()
-            }), 500
-    
-    @app.route('/api/merino/philosophy')
-    def get_merino_philosophy():
-        """Endpoint para obtener la filosofía de Jaime Merino"""
-        return jsonify({
-            'methodology': 'JAIME_MERINO',
-            'philosophy': merino_methodology.PHILOSOPHY,
-            'market_states': merino_methodology.MARKET_STATES,
-            'confluences': merino_methodology.CONFLUENCES,
-            'invalidation_rules': merino_methodology.INVALIDATION_RULES,
-            'trading_hours': merino_methodology.OPTIMAL_TRADING_HOURS
-        })
-    
-    @app.route('/api/merino/risk-management')
-    def get_risk_management():
-        """Endpoint para obtener reglas de gestión de riesgo"""
-        return jsonify({
-            'methodology': 'JAIME_MERINO',
-            'capital_allocation': '40-30-20-10',
-            'rules': config.RISK_MANAGEMENT,
-            'philosophy': {
-                'max_risk': merino_methodology.PHILOSOPHY['risk_motto'],
-                'discipline': merino_methodology.PHILOSOPHY['discipline']
+            # Señales de trading (metodología Jaime Merino)
+            'signals': {
+                'trend': random.choice(['ALCISTA', 'BAJISTA', 'LATERAL']),
+                'strength': random.choice(['FUERTE', 'MODERADA', 'DÉBIL']),
+                'recommendation': random.choice(['COMPRA', 'VENTA', 'ESPERAR']),
+                'confidence': round(random.uniform(60, 95), 1),
+                'entry_point': round(current_price * random.uniform(0.98, 1.02), 6),
+                'stop_loss': round(current_price * random.uniform(0.93, 0.97), 6),
+                'take_profit': round(current_price * random.uniform(1.03, 1.08), 6)
             }
-        })
+        }
     
-    @app.errorhandler(404)
-    def not_found(error):
-        """Maneja errores 404"""
+    return data
+
+def analysis_thread():
+    """Hilo principal de análisis"""
+    global analysis_active, trading_data
+    
+    logger.info("🚀 Iniciando análisis de mercado - Metodología Jaime Merino")
+    
+    while analysis_active:
+        try:
+            # Generar datos actualizados
+            trading_data = mock_market_data()
+            
+            # Emitir datos a todos los clientes conectados
+            socketio.emit('market_update', {
+                'data': trading_data,
+                'timestamp': datetime.now().isoformat(),
+                'philosophy': "El arte de tomar dinero de otros legalmente"
+            })
+            
+            logger.info(f"📊 Datos actualizados para {len(trading_data)} símbolos")
+            
+            # Esperar antes de la siguiente actualización
+            time.sleep(app.config['UPDATE_INTERVALS']['realtime'])
+            
+        except Exception as e:
+            logger.error(f"❌ Error en análisis: {e}")
+            time.sleep(30)  # Esperar más tiempo en caso de error
+
+# Rutas de la aplicación
+
+@app.route('/')
+def index():
+    """Página principal"""
+    return render_template('index.html')
+
+@app.route('/health')
+def health_check():
+    """Health check para Render"""
+    return jsonify({
+        'status': 'healthy',
+        'timestamp': datetime.now().isoformat(),
+        'app': 'Jaime Merino Enhanced Trading Bot',
+        'version': '2.0.0',
+        'methodology': 'Trading Latino Avanzado'
+    })
+
+@app.route('/api/status')
+def api_status():
+    """Estado de la API"""
+    return jsonify({
+        'analysis_active': analysis_active,
+        'symbols_count': len(trading_data),
+        'last_update': datetime.now().isoformat(),
+        'philosophy': "Es mejor perder una oportunidad que perder dinero"
+    })
+
+@app.route('/api/data')
+def get_market_data():
+    """Obtener datos de mercado actuales"""
+    return jsonify({
+        'success': True,
+        'data': trading_data,
+        'timestamp': datetime.now().isoformat()
+    })
+
+@app.route('/api/symbol/<symbol>')
+def get_symbol_data(symbol):
+    """Obtener datos de un símbolo específico"""
+    if symbol.upper() in trading_data:
         return jsonify({
-            'error': 'Endpoint no encontrado',
-            'methodology': 'JAIME_MERINO',
-            'available_endpoints': [
-                '/',
-                '/health',
-                '/api/merino/symbols',
-                '/api/merino/analysis/<symbol>',
-                '/api/merino/philosophy',
-                '/api/merino/risk-management'
-            ]
+            'success': True,
+            'data': trading_data[symbol.upper()],
+            'timestamp': datetime.now().isoformat()
+        })
+    else:
+        return jsonify({
+            'success': False,
+            'error': f'Símbolo {symbol} no encontrado'
         }), 404
-    
-    @app.errorhandler(500)
-    def internal_error(error):
-        """Maneja errores internos"""
-        logger.error(f"❌ Error interno del servidor: {error}")
-        return jsonify({
-            'error': 'Error interno del servidor',
-            'methodology': 'JAIME_MERINO',
-            'message': 'Consulte los logs para más detalles',
-            'philosophy': merino_methodology.PHILOSOPHY['discipline']
-        }), 500
 
-def setup_merino_background_services(socketio, socket_handlers, config):
-    """
-    Configura los servicios de fondo mejorados para la metodología Merino
-    
-    Args:
-        socketio: Instancia de SocketIO
-        socket_handlers: Manejadores de Socket.IO
-        config: Configuración de la aplicación
-    """
-    
-    def merino_auto_analysis():
-        """
-        Servicio de análisis automático según metodología Merino
-        """
-        logger.info("🔄 Servicio de análisis automático Merino iniciado")
-        logger.info(f"📈 Filosofía: {merino_methodology.PHILOSOPHY['main_principle']}")
-        
-        while True:
-            try:
-                # Usar intervalo del timeframe principal (4H)
-                interval = config.UPDATE_INTERVALS['4h']
-                time.sleep(interval)
-                
-                # Solo analizar si hay clientes conectados
-                if socket_handlers.get_connected_clients_count() > 0:
-                    logger.info(f"🔄 Iniciando análisis automático Merino para {len(config.TRADING_SYMBOLS)} símbolos")
-                    
-                    for symbol in config.TRADING_SYMBOLS:
-                        try:
-                            # Análisis completo según Merino
-                            analysis = enhanced_analysis_service.analyze_symbol_merino(symbol)
-                            
-                            if analysis:
-                                # Broadcast del análisis
-                                socket_handlers.broadcast_merino_analysis(symbol, analysis)
-                                
-                                # Log específico para señales fuertes
-                                signal_strength = analysis.get('signal', {}).get('signal_strength', 0)
-                                if signal_strength >= config.SIGNALS['min_strength_for_trade']:
-                                    logger.info(f"🎯 SEÑAL MERINO: {symbol} - {analysis.get('signal', {}).get('signal', 'UNKNOWN')} ({signal_strength}%)")
-                                
-                                # Pausa entre análisis para no sobrecargar
-                                time.sleep(5)
-                            else:
-                                logger.warning(f"⚠️ Análisis Merino falló para {symbol}")
-                                
-                        except Exception as e:
-                            logger.error(f"❌ Error en análisis automático de {symbol}: {e}")
-                            continue
-                    
-                    logger.info("✅ Ciclo de análisis automático Merino completado")
-                else:
-                    logger.debug("📭 No hay clientes conectados, saltando análisis automático")
-                    
-            except Exception as e:
-                logger.error(f"❌ Error en servicio de análisis automático Merino: {e}")
-                time.sleep(300)  # Esperar 5 minutos antes de reintentar
-    
-    def merino_market_monitor():
-        """
-        Monitor de mercado según criterios de Merino
-        """
-        logger.info("👁️ Monitor de mercado Merino iniciado")
-        
-        while True:
-            try:
-                time.sleep(config.UPDATE_INTERVALS['realtime'])
-                
-                # Monitorear Bitcoin (símbolo principal)
-                btc_price = binance_service.get_current_price('BTCUSDT')
-                
-                if btc_price:
-                    # Broadcast de precio en tiempo real
-                    socketio.emit('btc_price_update', {
-                        'price': btc_price,
-                        'timestamp': time.time(),
-                        'methodology': 'JAIME_MERINO'
-                    })
-                
-                # Cada 10 minutos, verificar estado general del mercado
-                if int(time.time()) % 600 == 0:
-                    market_sentiment = analyze_market_sentiment(config.TRADING_SYMBOLS[:5])
-                    socketio.emit('market_sentiment', {
-                        'sentiment': market_sentiment,
-                        'timestamp': time.time(),
-                        'methodology': 'JAIME_MERINO'
-                    })
-                
-            except Exception as e:
-                logger.error(f"❌ Error en monitor de mercado: {e}")
-                time.sleep(60)
-    
-    def merino_risk_monitor():
-        """
-        Monitor de riesgo según reglas de Merino
-        """
-        logger.info("🛡️ Monitor de riesgo Merino iniciado")
-        
-        while True:
-            try:
-                time.sleep(1800)  # Cada 30 minutos
-                
-                # Monitorear exposición total
-                risk_status = {
-                    'timestamp': time.time(),
-                    'methodology': 'JAIME_MERINO',
-                    'philosophy': merino_methodology.PHILOSOPHY['risk_motto'],
-                    'limits': config.RISK_MANAGEMENT,
-                    'status': 'MONITORING'
-                }
-                
-                socketio.emit('risk_status', risk_status)
-                
-            except Exception as e:
-                logger.error(f"❌ Error en monitor de riesgo: {e}")
-                time.sleep(300)
-    
-    # Iniciar servicios de fondo
-    analysis_thread = threading.Thread(target=merino_auto_analysis)
-    analysis_thread.daemon = True
-    analysis_thread.start()
-    
-    monitor_thread = threading.Thread(target=merino_market_monitor)
-    monitor_thread.daemon = True
-    monitor_thread.start()
-    
-    risk_thread = threading.Thread(target=merino_risk_monitor)
-    risk_thread.daemon = True
-    risk_thread.start()
-    
-    logger.info("✅ Servicios de fondo Merino iniciados")
+# Eventos de SocketIO
 
-def analyze_market_sentiment(symbols):
-    """
-    Analiza el sentimiento general del mercado
+@socketio.on('connect')
+def handle_connect():
+    """Cliente conectado"""
+    logger.info(f"🔗 Cliente conectado: {request.sid}")
     
-    Args:
-        symbols: Lista de símbolos a analizar
+    # Enviar datos actuales al cliente recién conectado
+    emit('market_update', {
+        'data': trading_data,
+        'timestamp': datetime.now().isoformat(),
+        'message': 'Conectado al Bot Jaime Merino - Trading Latino'
+    })
+
+@socketio.on('disconnect')
+def handle_disconnect():
+    """Cliente desconectado"""
+    logger.info(f"❌ Cliente desconectado: {request.sid}")
+
+@socketio.on('request_update')
+def handle_request_update():
+    """Cliente solicita actualización manual"""
+    logger.info(f"🔄 Actualización solicitada por: {request.sid}")
+    
+    # Generar nuevos datos
+    global trading_data
+    trading_data = mock_market_data()
+    
+    emit('market_update', {
+        'data': trading_data,
+        'timestamp': datetime.now().isoformat(),
+        'message': 'Datos actualizados manualmente'
+    })
+
+@socketio.on('subscribe_symbol')
+def handle_subscribe_symbol(data):
+    """Suscribirse a un símbolo específico"""
+    symbol = data.get('symbol', '').upper()
+    logger.info(f"📊 Suscripción a {symbol} por: {request.sid}")
+    
+    if symbol in trading_data:
+        emit('symbol_update', {
+            'symbol': symbol,
+            'data': trading_data[symbol],
+            'timestamp': datetime.now().isoformat()
+        })
+
+def start_background_services():
+    """Iniciar servicios en segundo plano"""
+    global analysis_active
+    
+    if not analysis_active:
+        analysis_active = True
         
-    Returns:
-        Sentimiento del mercado
-    """
-    try:
-        bullish_count = 0
-        bearish_count = 0
-        neutral_count = 0
+        # Iniciar hilo de análisis
+        analysis_thread_obj = threading.Thread(target=analysis_thread, daemon=True)
+        analysis_thread_obj.start()
         
-        for symbol in symbols:
-            try:
-                # Análisis rápido de EMAs para determinar sesgo
-                df = binance_service.get_klines(symbol, '4h', 20)
-                if df is not None and len(df) >= 11:
-                    ema_11 = df['close'].ewm(span=11).mean().iloc[-1]
-                    ema_55 = df['close'].ewm(span=55).mean().iloc[-1] if len(df) >= 55 else ema_11
-                    
-                    if ema_11 > ema_55 * 1.005:  # 0.5% threshold
-                        bullish_count += 1
-                    elif ema_11 < ema_55 * 0.995:
-                        bearish_count += 1
-                    else:
-                        neutral_count += 1
-                        
-            except Exception:
-                neutral_count += 1
-                continue
-        
-        total = bullish_count + bearish_count + neutral_count
-        if total == 0:
-            return 'UNKNOWN'
-        
-        bullish_pct = (bullish_count / total) * 100
-        bearish_pct = (bearish_count / total) * 100
-        
-        if bullish_pct >= 60:
-            return 'BULLISH'
-        elif bearish_pct >= 60:
-            return 'BEARISH'
-        else:
-            return 'MIXED'
+        logger.info("✅ Servicios de fondo iniciados")
+
+def create_basic_template():
+    """Crear template básico si no existe"""
+    template_dir = 'templates'
+    os.makedirs(template_dir, exist_ok=True)
+    
+    template_path = os.path.join(template_dir, 'index.html')
+    
+    if not os.path.exists(template_path):
+        html_content = '''<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🚀 Jaime Merino Trading Bot</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #1a1a1a; color: #fff; }
+        .header { text-align: center; margin-bottom: 30px; }
+        .philosophy { background: #2a2a2a; padding: 15px; border-radius: 8px; margin: 20px 0; }
+        .symbols-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+        .symbol-card { background: #2a2a2a; border-radius: 8px; padding: 20px; border-left: 4px solid #00ff88; }
+        .price { font-size: 24px; font-weight: bold; color: #00ff88; }
+        .change { font-size: 18px; margin: 10px 0; }
+        .positive { color: #00ff88; }
+        .negative { color: #ff4444; }
+        .indicators { margin-top: 15px; }
+        .indicator { display: flex; justify-content: space-between; margin: 5px 0; }
+        .signals { background: #3a3a3a; padding: 10px; border-radius: 5px; margin-top: 10px; }
+        .status { position: fixed; top: 20px; right: 20px; background: #00ff88; color: #000; padding: 10px; border-radius: 5px; }
+        .loading { text-align: center; margin: 50px 0; }
+    </style>
+</head>
+<body>
+    <div class="status" id="status">🔴 Desconectado</div>
+    
+    <div class="header">
+        <h1>🚀 Jaime Merino Trading Bot</h1>
+        <h2>📈 Metodología Trading Latino Avanzada</h2>
+    </div>
+    
+    <div class="philosophy">
+        <h3>💡 Filosofía de Trading</h3>
+        <p><strong>"El arte de tomar dinero de otros legalmente"</strong></p>
+        <p><strong>"Es mejor perder una oportunidad que perder dinero"</strong></p>
+        <p><strong>"Solo operamos con alta probabilidad de éxito"</strong></p>
+    </div>
+    
+    <div class="loading" id="loading">🔄 Conectando al servidor...</div>
+    
+    <div id="symbols-container" class="symbols-grid" style="display: none;"></div>
+
+    <script>
+        const socket = io();
+        const statusEl = document.getElementById('status');
+        const loadingEl = document.getElementById('loading');
+        const containerEl = document.getElementById('symbols-container');
+
+        socket.on('connect', function() {
+            statusEl.textContent = '🟢 Conectado';
+            statusEl.style.background = '#00ff88';
+            loadingEl.style.display = 'none';
+            containerEl.style.display = 'grid';
+        });
+
+        socket.on('disconnect', function() {
+            statusEl.textContent = '🔴 Desconectado';
+            statusEl.style.background = '#ff4444';
+        });
+
+        socket.on('market_update', function(response) {
+            updateMarketData(response.data);
+        });
+
+        function updateMarketData(data) {
+            containerEl.innerHTML = '';
             
-    except Exception as e:
-        logger.error(f"❌ Error analizando sentimiento: {e}")
-        return 'UNKNOWN'
+            Object.values(data).forEach(symbol => {
+                const card = createSymbolCard(symbol);
+                containerEl.appendChild(card);
+            });
+        }
 
-def perform_initial_merino_analysis(socket_handlers, config):
-    """
-    Realiza análisis inicial según metodología Merino
-    
-    Args:
-        socket_handlers: Manejadores de Socket.IO
-        config: Configuración de la aplicación
-    """
-    try:
-        logger.info("🔄 Iniciando análisis inicial Merino...")
-        logger.info(f"📈 {merino_methodology.PHILOSOPHY['discipline']}")
-        
-        # Esperar estabilización del servidor
-        time.sleep(10)
-        
-        completed = 0
-        high_probability_signals = 0
-        
-        for symbol in config.TRADING_SYMBOLS:
-            try:
-                analysis = enhanced_analysis_service.analyze_symbol_merino(symbol)
+        function createSymbolCard(symbol) {
+            const card = document.createElement('div');
+            card.className = 'symbol-card';
+            
+            const changeClass = symbol.change_24h >= 0 ? 'positive' : 'negative';
+            const changeSign = symbol.change_24h >= 0 ? '+' : '';
+            
+            card.innerHTML = `
+                <h3>${symbol.symbol}</h3>
+                <div class="price">$${symbol.price}</div>
+                <div class="change ${changeClass}">${changeSign}${symbol.change_24h}%</div>
                 
-                if analysis:
-                    socket_handlers.cache_merino_analysis(symbol, analysis)
-                    completed += 1
-                    
-                    # Contar señales de alta probabilidad
-                    signal_strength = analysis.get('signal', {}).get('signal_strength', 0)
-                    if signal_strength >= config.SIGNALS['min_strength_for_trade']:
-                        high_probability_signals += 1
-                        logger.info(f"🎯 Alta probabilidad detectada: {symbol} ({signal_strength}%)")
-                    
-                    logger.info(f"✅ Análisis inicial Merino: {symbol} ({completed}/{len(config.TRADING_SYMBOLS)})")
-                else:
-                    logger.warning(f"⚠️ Análisis inicial falló: {symbol}")
+                <div class="indicators">
+                    <div class="indicator">
+                        <span>RSI:</span>
+                        <span>${symbol.indicators.rsi}</span>
+                    </div>
+                    <div class="indicator">
+                        <span>MACD:</span>
+                        <span>${symbol.indicators.macd}</span>
+                    </div>
+                    <div class="indicator">
+                        <span>ADX:</span>
+                        <span>${symbol.indicators.adx}</span>
+                    </div>
+                </div>
                 
-                # Pausa entre análisis
-                time.sleep(3)
-                
-            except Exception as e:
-                logger.error(f"❌ Error en análisis inicial de {symbol}: {e}")
-                continue
-        
-        logger.info(f"🏁 Análisis inicial Merino completado:")
-        logger.info(f"   • Total analizado: {completed}/{len(config.TRADING_SYMBOLS)}")
-        logger.info(f"   • Señales alta probabilidad: {high_probability_signals}")
-        logger.info(f"   • Filosofía: {merino_methodology.PHILOSOPHY['main_principle']}")
-        
-    except Exception as e:
-        logger.error(f"❌ Error en análisis inicial Merino: {e}")
+                <div class="signals">
+                    <div><strong>Tendencia:</strong> ${symbol.signals.trend}</div>
+                    <div><strong>Recomendación:</strong> ${symbol.signals.recommendation}</div>
+                    <div><strong>Confianza:</strong> ${symbol.signals.confidence}%</div>
+                </div>
+            `;
+            
+            return card;
+        }
 
-def main():
-    """Función principal para ejecutar el Jaime Merino Trading Bot"""
-    try:
-        # Configuración mejorada para producción
-        port = int(os.environ.get('PORT', 5000))
-        host = os.environ.get('HOST', '0.0.0.0')
-        debug = os.environ.get('DEBUG', 'False').lower() == 'true'
+        // Solicitar actualización cada 30 segundos
+        setInterval(() => {
+            socket.emit('request_update');
+        }, 30000);
+    </script>
+</body>
+</html>'''
         
-        logger.info("🎯 ¡Jaime Merino Trading Bot iniciado!")
-        logger.info(f"📈 Metodología: {merino_methodology.PHILOSOPHY['main_principle']}")
-        print("=" * 80)
-        print(f"🌐 Servidor Merino disponible en: http://{host}:{port}")
-        print(f"📱 Dashboard: http://localhost:{port}")
-        print(f"🧠 Filosofía: {merino_methodology.PHILOSOPHY['discipline']}")
-        print("=" * 80)
-        print("🎯 ¡Jaime Merino Trading Bot iniciado!")
+        with open(template_path, 'w', encoding='utf-8') as f:
+            f.write(html_content)
         
-        # Mostrar configuración
-        config_name = os.environ.get('FLASK_ENV', 'development')
-        config_class = merino_config.get(config_name, merino_config['default'])
-        
-        logger.info(f"🔧 Configuración Merino:")
-        logger.info(f"   • Ambiente: {config_name}")
-        logger.info(f"   • Símbolos: {config_class.TRADING_SYMBOLS}")
-        logger.info(f"   • Timeframe principal: {config_class.TIMEFRAMES['primary']}")
-        logger.info(f"   • Intervalo actualización: {config_class.UPDATE_INTERVALS}")
-        logger.info(f"   • Gestión riesgo: {config_class.RISK_MANAGEMENT['btc_long_term_pct']}-{config_class.RISK_MANAGEMENT['weekly_charts_pct']}-{config_class.RISK_MANAGEMENT['daily_trading_pct']}-{config_class.RISK_MANAGEMENT['futures_pct']}")
-        logger.info(f"   • Puerto: {config_class.PORT}")
-        logger.info(f"   • Host: {config_class.HOST}")
-        logger.info(f"   • Debug: {config_class.DEBUG}")
-        
-        # Verificar conexión a Binance
-        logger.info("🔍 Verificando conexión a Binance...")
-        if binance_service.test_connection():
-            logger.info("✅ Conexión a Binance exitosa")
-        else:
-            logger.warning("⚠️ Conexión a Binance falló - usando modo demo")
-        
-        # Crear aplicación
-        app, socketio, socket_handlers = create_merino_app(config_name)
-        
-        # Análisis inicial en hilo separado
-        logger.info("📊 Iniciando análisis inicial Merino...")
-        initial_thread = threading.Thread(
-            target=perform_initial_merino_analysis,
-            args=(socket_handlers, config_class)
-        )
-        initial_thread.daemon = True
-        initial_thread.start()
-        
-        # Información de inicio
-        print("=" * 80)
-        print(f"🌐 Servidor Merino disponible en: http://{config_class.HOST}:{config_class.PORT}")
-        print(f"📱 Dashboard: http://localhost:{config_class.PORT}")
-        print(f"❤️ Health check: http://localhost:{config_class.PORT}/health")
-        print(f"📊 API Símbolos: http://localhost:{config_class.PORT}/api/merino/symbols")
-        print(f"🧠 Filosofía: http://localhost:{config_class.PORT}/api/merino/philosophy")
-        print(f"🛡️ Gestión Riesgo: http://localhost:{config_class.PORT}/api/merino/risk-management")
-        print("=" * 80)
-        print("🎯 ¡Jaime Merino Trading Bot iniciado!")
-        print("💡 Presiona Ctrl+C para detener")
-        print("📚 Metodología: EMAs + ADX + Squeeze Momentum + Volume Profile")
-        print("=" * 80)
-        
-        # Iniciar servidor
-        socketio.run(
-            app,
-            host=config_class.HOST,
-            port=config_class.PORT,
-            debug=config_class.DEBUG,
-            allow_unsafe_werkzeug=True
-        )
-        
-    except KeyboardInterrupt:
-        logger.info("⏹️ Deteniendo Jaime Merino Bot por solicitud del usuario...")
-        print("\n" + "=" * 80)
-        print("👋 Gracias por usar Jaime Merino Trading Bot")
-        print("📈 Recuerda: 'Es mejor perder una oportunidad que perder dinero'")
-        print("=" * 80)
-    except Exception as e:
-        logger.error(f"❌ Error crítico al iniciar Jaime Merino Bot: {e}")
-        import traceback
-        logger.error(traceback.format_exc())
-    finally:
-        logger.info("👋 Jaime Merino Trading Bot finalizado")
+        logger.info("✅ Template básico creado")
 
 if __name__ == '__main__':
-    try:
-        # Configuración mejorada para producción
-        port = int(os.environ.get('PORT', 5000))
-        host = os.environ.get('HOST', '0.0.0.0')
-        debug = os.environ.get('DEBUG', 'False').lower() == 'true'
-        
-        logger.info("🎯 ¡Jaime Merino Trading Bot iniciado!")
-        logger.info(f"📈 Metodología: {merino_methodology.PHILOSOPHY['main_principle']}")
-        print("=" * 80)
-        print(f"🌐 Servidor Merino disponible en: http://{host}:{port}")
-        print(f"📱 Dashboard: http://localhost:{port}")
-        print(f"🧠 Filosofía: {merino_methodology.PHILOSOPHY['discipline']}")
-        print("=" * 80)
-        print("🎯 ¡Jaime Merino Trading Bot iniciado!")
-        
-        # Verificar conexión a Binance
-        logger.info("🔍 Verificando conexión a Binance...")
-        if binance_service.test_connection():
-            logger.info("✅ Conexión a Binance exitosa")
-        else:
-            logger.warning("⚠️ Conexión a Binance falló - usando modo demo")
-        
-        # Crear aplicación
-        app, socketio, socket_handlers = create_merino_app()
-        
-        # ✅ CONFIGURACIÓN PARA RENDER
-        socketio.run(
-            app, 
-            host=host, 
-            port=port, 
-            debug=debug,
-            use_reloader=False,  # Importante para producción
-            log_output=True
-        )
-        
-    except Exception as e:
-        logger.error(f"❌ Error crítico al iniciar Jaime Merino Bot: {e}")
-        import traceback
-        traceback.print_exc()
+    logger.info("🚀 Iniciando Jaime Merino Enhanced Trading Bot")
+    logger.info("📈 Metodología: Trading Latino Avanzado")
+    
+    # Crear template si no existe
+    create_basic_template()
+    
+    # Inicializar datos
+    trading_data = mock_market_data()
+    
+    # Iniciar servicios de fondo
+    start_background_services()
+    
+    logger.info(f"🌍 Servidor iniciando en {app.config['HOST']}:{app.config['PORT']}")
+    
+    # Ejecutar aplicación (configuración específica para Render)
+    socketio.run(
+        app,
+        host=app.config['HOST'],
+        port=app.config['PORT'],
+        debug=app.config['DEBUG'],
+        allow_unsafe_werkzeug=True  # Necesario para Render
+    )
